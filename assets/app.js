@@ -193,10 +193,13 @@
           .catch(failure);
       }
     });
+    window.__nccal = fc;
     fc.render();
+    requestAnimationFrame(function () { try { fc.updateSize(); } catch (e) {} });
   }
 
   /* ---------- boot ---------- */
+  function boot() {
   initTheme();
   document.getElementById('modal-close').addEventListener('click', closeModal);
   document.getElementById('event-modal').addEventListener('click', function (e) {
@@ -219,4 +222,7 @@
     .catch(function () {
       document.getElementById('calendar-list').innerHTML = '<p class="muted small">Could not load calendars.</p>';
     });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
 })();
