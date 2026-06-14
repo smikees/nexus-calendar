@@ -158,11 +158,7 @@
         right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
       },
       buttonText: { today: 'Today', month: 'Month', week: 'Week', day: 'Day', list: 'Agenda' },
-      eventOrder: function (a, b) {
-        var oa = orderIndex(a.extendedProps.calendar), ob = orderIndex(b.extendedProps.calendar);
-        if (oa !== ob) return oa - ob;
-        return (a.start ? a.start.getTime() : 0) - (b.start ? b.start.getTime() : 0);
-      },
+      eventOrder: 'order,start',
       datesSet: function (info) { localStorage.setItem(K.view, info.view.type); },
       eventClick: function (info) { info.jsEvent.preventDefault(); openModal(info); },
       eventDidMount: function (info) {
@@ -185,7 +181,9 @@
           .then(function (d) {
             var colors = readJSON(K.colors, {});
             (d.events || []).forEach(function (e) {
-              var slug = e.extendedProps && e.extendedProps.calendar;
+              e.extendedProps = e.extendedProps || {};
+              var slug = e.extendedProps.calendar;
+              e.extendedProps.order = orderIndex(slug);
               if (slug && colors[slug]) e.color = colors[slug];
             });
             success(d.events || []);
