@@ -66,10 +66,21 @@ if ($uhttp !== 200 || empty($info['sub'])) {
 // Upsert the user, then issue the auth cookie.
 $pdo  = db();
 $stmt = $pdo->prepare(
-    'INSERT INTO users (google_sub, email, display_name, avatar_url) VALUES (?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE email = VALUES(email), display_name = VALUES(display_name), avatar_url = VALUES(avatar_url)'
+    'INSERT INTO users (google_sub, email, display_name) VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE email = VALUES(email), display_name = VALUES(display_name)'
 );
-$stmt->execute([$info['sub'], $info['email'] ?? '', $info['name'] ?? null, $info['picture'] ?? null]);
+$stmt->execute([$info['sub'], $info['email'] ?? '', $info['name'] ?? null]);
+
+// Avatar is optional: only persist if the column exists (migration applied).
+// This keeps login working even if db_migrate_phase4.sql hasn't been run yet.
+if (!empty($info['picture'])) {
+    try {
+        $av = $pdo->prepare('UPDATE users SET avatar_url = ? WHERE google_sub = ?');
+        $av->execute([$info['picture'], $info['sub']]);
+    } catch (PDOException $e) {
+        // avatar_url column not present yet; ignore.
+    }
+}
 
 $stmt = $pdo->prepare('SELECT * FROM users WHERE google_sub = ?');
 $stmt->execute([$info['sub']]);

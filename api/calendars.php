@@ -22,9 +22,17 @@ foreach (visible_calendars() as $c) {
 $u = current_user();
 $userOut = null;
 if ($u) {
-    $stmt = db()->prepare('SELECT email, display_name, avatar_url FROM users WHERE id = ?');
-    $stmt->execute([(int) $u['uid']]);
-    $row = $stmt->fetch() ?: [];
+    $row = [];
+    try {
+        $stmt = db()->prepare('SELECT email, display_name, avatar_url FROM users WHERE id = ?');
+        $stmt->execute([(int) $u['uid']]);
+        $row = $stmt->fetch() ?: [];
+    } catch (PDOException $e) {
+        // avatar_url not migrated yet; fall back to core columns.
+        $stmt = db()->prepare('SELECT email, display_name FROM users WHERE id = ?');
+        $stmt->execute([(int) $u['uid']]);
+        $row = $stmt->fetch() ?: [];
+    }
     $userOut = [
         'email'    => $row['email'] ?? $u['email'],
         'name'     => $row['display_name'] ?? null,
