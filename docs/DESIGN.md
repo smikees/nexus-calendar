@@ -125,6 +125,16 @@ user_calendar_prefs                    -- per-user view of any calendar
   color_override  VARCHAR(9) NULL
   priority_override INT NULL
   PRIMARY KEY (user_id, calendar_id)
+
+calendar_shares                        -- share a private calendar with others
+  id               BIGINT PK
+  calendar_id      BIGINT FK
+  shared_with_email VARCHAR             -- invited by email (may pre-date their first login)
+  shared_with_user_id BIGINT NULL FK    -- resolved to a user on their login
+  role             ENUM('viewer','editor')
+  created_by       BIGINT FK            -- the owner who shared it
+  created_at       DATETIME
+  UNIQUE (calendar_id, shared_with_email)
 ```
 
 All tables `DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`; PDO DSN uses
@@ -144,7 +154,11 @@ color/priority overrides, theme) lives in `localStorage` and is applied client-s
   calendars and their events.
 - **Authorization rules**
   - Public calendars: world-readable; writable only by admin.
-  - Private calendars: readable/writable only by `owner_user_id`.
+  - Private calendars: readable/writable by `owner_user_id`, plus anyone in
+    `calendar_shares` for that calendar — `viewer` = read-only, `editor` = can CRUD events.
+  - Sharing is invited by email; the share resolves to a `user_id` when that person
+    next logs in (email matched against their Google account). Only the owner can
+    add/remove shares or change a calendar's settings; shared users can't re-share.
   - `.ics` of a private calendar: reachable via its unguessable `feed_token` (so
     external apps can subscribe), otherwise auth required.
 
@@ -167,6 +181,9 @@ POST   /api/import                    upload .ics into a calendar
 GET    /cal/:slug.ics                 iCal export feed (token for private)
 GET    /api/calendar.json             documented AI-readable feed (see §11)
 POST   /api/prefs                     persist enabled/hierarchy/theme (logged-in)
+GET    /api/calendars/:id/shares      list shares (owner only)
+POST   /api/calendars/:id/shares      add a share {email, role} (owner only)
+DELETE /api/calendars/:id/shares/:sid remove a share (owner only)
 ```
 
 Server-side recurrence: the API expands `rrule` into concrete occurrences for the
@@ -260,27 +277,4 @@ representations (UI / iCal / JSON).
 
 ## 12. Notifications & PWA
 
-- Installable via Web App Manifest.
-- Service worker caches the app shell (works on flaky connections) and shows
-  notifications for upcoming events the client already knows about, scheduled while the
-  app is open/installed. No server push, no cron — matches the hosting constraints.
-- Notifications are opt-in (explicit permission request), per the platform rules.
-
----
-
-## 13. Security
-
-- `config.php` denied by `.htaccess`; `.git` blocked; `Options -Indexes`.
-- All DB access via PDO prepared statements.
-- Every write checks ownership/admin; CSRF state on the OAuth round-trip.
-- Private `.ics` reachable only via unguessable `feed_token`.
-- Validate and bound `from`/`to` windows to cap recurrence-expansion cost.
-
----
-
-## 14. Deferred / future (explicitly out of scope for v1)
-
-- Automated ingestion of public data (earnings, Fed, fixtures) — manual curation for now.
-- True background web push (VAPID + cron).
-- Sharing private calendars between users; collaborative editing.
-- Natural-language summary endpoint on top of `/api/calendar.json`.
+- Instal

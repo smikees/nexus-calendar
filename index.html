@@ -1,12 +1,21 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>Nexus Calendar</title>
+  <script>
+    (function () {
+      var r = document.documentElement;
+      r.dataset.mode = localStorage.getItem('nc_mode_v1') || 'dark';
+      r.dataset.theme = localStorage.getItem('nc_theme_v1') || 'sky';
+    })();
+  </script>
   <link rel="stylesheet" href="/assets/app.css">
+  <script src="/assets/vendor/rrule.min.js"></script>
   <script src="/assets/vendor/fullcalendar.global.min.js"></script>
+  <script src="/assets/vendor/fullcalendar-rrule.global.min.js"></script>
 </head>
 <body>
   <header class="topbar">
@@ -15,6 +24,14 @@
       <span class="brand-name">Nexus <strong>Calendar</strong></span>
     </div>
     <nav class="actions">
+      <div class="theme-ctl">
+        <button id="mode-toggle" class="icon-btn" title="Toggle light / dark" aria-label="Toggle light or dark mode">◐</button>
+        <select id="theme-select" class="theme-select" title="Color theme" aria-label="Color theme">
+          <option value="sky">Sky</option>
+          <option value="violet">Violet</option>
+          <option value="emerald">Emerald</option>
+        </select>
+      </div>
       <div id="auth" class="auth"><span class="muted">…</span></div>
     </nav>
   </header>

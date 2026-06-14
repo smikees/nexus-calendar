@@ -55,7 +55,11 @@ account settings). Everything after this I can build and deploy.
 - In-place edit + drag/resize → `PATCH` (optimistic, with rollback).
 - Persist enabled/hierarchy/theme server-side (`user_calendar_prefs`, `/api/prefs`).
 - Admin can create/edit public calendars from the same UI.
-- **Done when:** I (logged in) manage my own calendars and you (admin) manage public ones.
+- **Calendar sharing:** owner shares a private calendar with another user by email as
+  `viewer` (read-only) or `editor` (CRUD events); `calendar_shares` table; shares resolve
+  to the invitee on their next login; shared calendars appear in their sidebar. Owner-only
+  manage; no re-sharing. (Added per request 2026-06-14.)
+- **Done when:** I (logged in) manage my own calendars, share one with another account, and you (admin) manage public ones.
 
 ## Phase 5 — Import / export + AI format
 **Goal:** interoperability.
@@ -89,7 +93,3 @@ account settings). Everything after this I can build and deploy.
 
 ## Risks / watch-items
 - **No cron/background** → notifications are client-side only (accepted in v1).
-- **Recurrence cost** → always bound the query window server-side.
-- **utf8mb4** → enforce on every table + the PDO DSN (per infra lesson) to avoid `????`.
-- **Composer in CI** → keep `vendor/` out of git; let the Action build it, FTP upload it.
-- **Mount truncation** (seen during setup) → validate any file copied through the mount before deploy.

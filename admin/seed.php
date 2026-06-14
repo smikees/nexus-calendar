@@ -28,16 +28,16 @@ function upsert_calendar(PDO $pdo, array $c): int {
 
 function upsert_event(PDO $pdo, int $calId, array $e): void {
     $stmt = $pdo->prepare(
-        'INSERT INTO events (calendar_id, uid, title, description, location, starts_at, ends_at, all_day, timezone)
-         VALUES (:cal, :uid, :title, :description, :location, :starts, :ends, :allday, "UTC")
+        'INSERT INTO events (calendar_id, uid, title, description, location, starts_at, ends_at, all_day, rrule, timezone)
+         VALUES (:cal, :uid, :title, :description, :location, :starts, :ends, :allday, :rrule, "UTC")
          ON DUPLICATE KEY UPDATE title=VALUES(title), description=VALUES(description),
             location=VALUES(location), starts_at=VALUES(starts_at), ends_at=VALUES(ends_at),
-            all_day=VALUES(all_day), calendar_id=VALUES(calendar_id)'
+            all_day=VALUES(all_day), rrule=VALUES(rrule), calendar_id=VALUES(calendar_id)'
     );
     $stmt->execute([
         ':cal' => $calId, ':uid' => $e['uid'], ':title' => $e['title'],
         ':description' => $e['description'] ?? null, ':location' => $e['location'] ?? null,
-        ':starts' => $e['starts'], ':ends' => $e['ends'], ':allday' => $e['allday'] ?? 0,
+        ':starts' => $e['starts'], ':ends' => $e['ends'], ':allday' => $e['allday'] ?? 0, ':rrule' => $e['rrule'] ?? null,
     ]);
 }
 
@@ -50,6 +50,7 @@ foreach ([
     ['uid'=>'fin-fomc-202606','title'=>'FOMC Rate Decision','starts'=>'2026-06-17 18:00:00','ends'=>'2026-06-17 18:30:00'],
     ['uid'=>'fin-nvda-202606','title'=>'Nvidia Earnings (sample)','starts'=>'2026-06-24 20:00:00','ends'=>'2026-06-24 21:00:00'],
     ['uid'=>'fin-jobs-202607','title'=>'US Jobs Report','starts'=>'2026-07-02 12:30:00','ends'=>'2026-07-02 13:00:00'],
+    ['uid'=>'fin-recap-weekly','title'=>'Weekly Market Recap','starts'=>'2026-06-05 21:00:00','ends'=>'2026-06-05 21:30:00','rrule'=>'FREQ=WEEKLY;BYDAY=FR'],
 ] as $e) { upsert_event($pdo, $finance, $e); }
 
 $wc = upsert_calendar($pdo, [
