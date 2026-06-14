@@ -27,6 +27,7 @@ jobs:
             **/.git*
             **/.git*/**
             **/.github/**
+            docs/**
             README.md
             stamih-infra.md
             config.php
