@@ -7,3 +7,11 @@ DirectoryIndex index.html index.php
 RedirectMatch 404 /\.git(/|$)
 RedirectMatch 404 ^/lib/
 RedirectMatch 404 \.sql$
+
+# Always revalidate HTML so deploys reach users immediately.
+# Static assets are cache-busted via ?v= query strings, so they may cache.
+<IfModule mod_headers.c>
+    <FilesMatch "\.html$">
+        Header set Cache-Control "no-cache, must-revalidate, max-age=0"
+    </FilesMatch>
+</IfModule>

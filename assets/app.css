@@ -1,5 +1,6 @@
 /* ---------- theme tokens ---------- */
 :root {                      /* defaults: dark + sky */
+  color-scheme: dark;
   --accent: #0ea5e9; --accent-ink: #ffffff;
   --bg-grad: radial-gradient(circle at 30% 20%, #1e293b 0%, #0f172a 55%, #020617 100%);
   --panel: rgba(255,255,255,0.05);
@@ -14,6 +15,7 @@
   --fc-popover-bg: #0f1b2e;
 }
 [data-mode="light"] {
+  color-scheme: light;
   --bg-grad: radial-gradient(circle at 30% 0%, #ffffff 0%, #eef2f7 60%, #e2e8f0 100%);
   --panel: rgba(15,23,42,0.04);
   --border: rgba(15,23,42,0.12);
@@ -25,6 +27,7 @@
   --fc-list-event-hover-bg-color: rgba(15,23,42,0.04);
   --fc-popover-bg: #ffffff;
 }
+[data-mode="dark"] { color-scheme: dark; }
 [data-theme="sky"]     { --accent: #0ea5e9; --accent-ink: #ffffff; }
 [data-theme="violet"]  { --accent: #8b5cf6; --accent-ink: #ffffff; }
 [data-theme="emerald"] { --accent: #10b981; --accent-ink: #04231a; }
