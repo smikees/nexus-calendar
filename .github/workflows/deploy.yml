@@ -18,9 +18,20 @@ jobs:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          # FTP account must be scoped to the cal.stamih.com document root
-          # (public_html/cal.stamih.com/) so uploads land where Apache serves.
+          # FTP account is scoped to the cal.stamih.com document root,
+          # so uploads land directly where Apache serves.
           server-dir: ./
-          # Don't upload repo/CI metadata or local-only files, and never touch
-          # server-side dirs that must be preserved (SSL validation, cgi, old upload dir).
-          exc
+          # Keep CI/local-only files off the server, and never delete
+          # server-side dirs that must be preserved.
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            README.md
+            stamih-infra.md
+            config.php
+            .env
+            **/*.log
+            .well-known/**
+            cgi-bin/**
+            cal_admin/**
