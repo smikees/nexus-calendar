@@ -6,6 +6,7 @@
   <meta name="robots" content="noindex">
   <title>Nexus Calendar</title>
   <link rel="stylesheet" href="/assets/app.css">
+  <script src="/assets/vendor/fullcalendar.global.min.js"></script>
 </head>
 <body>
   <header class="topbar">
@@ -18,14 +19,30 @@
     </nav>
   </header>
 
-  <main class="stage">
-    <section class="placeholder">
-      <h1>The calendar is coming together</h1>
-      <p>Phase 1 is live: accounts and sign-in work. Public calendars and the
-         calendar grid arrive next.</p>
-      <p class="muted small" id="status">Checking your session…</p>
-    </section>
-  </main>
+  <div class="app">
+    <aside class="sidebar">
+      <h2 class="sidebar-title">Calendars</h2>
+      <div id="calendar-list" class="cal-list"><p class="muted small">Loading…</p></div>
+      <div id="admin-tools" class="admin-tools" hidden>
+        <a class="btn small" href="/admin/seed.php">Load sample data</a>
+      </div>
+    </aside>
+
+    <main class="calendar-wrap">
+      <div id="calendar"></div>
+    </main>
+  </div>
+
+  <div id="event-modal" class="modal" hidden>
+    <div class="modal-card">
+      <button class="modal-close" id="modal-close" aria-label="Close">×</button>
+      <h3 id="modal-title"></h3>
+      <p id="modal-cal" class="muted small"></p>
+      <p id="modal-when"></p>
+      <p id="modal-where" class="muted"></p>
+      <p id="modal-desc" class="muted small"></p>
+    </div>
+  </div>
 
   <script src="/assets/app.js"></script>
 </body>

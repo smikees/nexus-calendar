@@ -1,69 +1,92 @@
 :root {
-  --bg: #0f172a;
   --bg-grad: radial-gradient(circle at 30% 20%, #1e293b 0%, #0f172a 55%, #020617 100%);
   --panel: rgba(255,255,255,0.04);
+  --panel-2: rgba(255,255,255,0.06);
   --border: rgba(255,255,255,0.10);
   --text: #e2e8f0;
   --muted: #94a3b8;
   --accent: #38bdf8;
   --accent-ink: #04293b;
+
+  /* FullCalendar theming */
+  --fc-border-color: rgba(255,255,255,0.10);
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: rgba(255,255,255,0.03);
+  --fc-today-bg-color: rgba(56,189,248,0.10);
+  --fc-button-bg-color: rgba(255,255,255,0.06);
+  --fc-button-border-color: rgba(255,255,255,0.12);
+  --fc-button-hover-bg-color: rgba(255,255,255,0.12);
+  --fc-button-hover-border-color: var(--accent);
+  --fc-button-active-bg-color: var(--accent);
+  --fc-list-event-hover-bg-color: rgba(255,255,255,0.06);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background: var(--bg-grad);
-  color: var(--text);
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+  background: var(--bg-grad); color: var(--text);
+  min-height: 100vh; display: flex; flex-direction: column;
 }
 
 .topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--border);
-  background: rgba(2,6,23,0.5);
-  backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 18px; border-bottom: 1px solid var(--border);
+  background: rgba(2,6,23,0.6); backdrop-filter: blur(6px);
+  position: sticky; top: 0; z-index: 20;
 }
 .brand { display: flex; align-items: center; gap: 10px; }
-.brand-mark {
-  width: 30px; height: 30px; border-radius: 8px;
-  display: grid; place-items: center;
-  background: var(--accent); color: var(--accent-ink);
-  font-weight: 800;
-}
-.brand-name { font-size: 1.05rem; font-weight: 500; letter-spacing: .2px; }
+.brand-mark { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
+  background: var(--accent); color: var(--accent-ink); font-weight: 800; }
 .brand-name strong { color: var(--accent); }
+.auth { display: flex; align-items: center; gap: 10px; font-size: .9rem; }
 
-.actions { display: flex; align-items: center; gap: 10px; }
-.auth { display: flex; align-items: center; gap: 12px; font-size: .92rem; }
-.auth .user { color: var(--text); }
-
-.btn {
-  display: inline-block;
-  padding: 8px 14px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  color: var(--text);
-  text-decoration: none;
-  font-size: .9rem;
-  transition: background .15s ease, border-color .15s ease;
-}
+.btn { display: inline-block; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border);
+  color: var(--text); text-decoration: none; font-size: .88rem; cursor: pointer;
+  transition: background .15s, border-color .15s; }
 .btn:hover { background: var(--panel); border-color: var(--accent); }
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
-.btn.primary:hover { filter: brightness(1.05); }
+.btn.small { padding: 5px 10px; font-size: .82rem; }
 
-.stage { flex: 1; display: grid; place-items: center; padding: 24px; }
-.placeholder { max-width: 560px; text-align: center; }
-.placeholder h1 {
-  font-size: clamp(1.6rem, 4vw, 2.4rem);
-  margin-bottom: 14px;
-  background: linear-gradient(90deg, #e2e8f0, var(--accent));
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-}
-.placeholder p { color: var(--muted); line-height: 1.6; margin-top: 8px; }
+.app { flex: 1; display: flex; min-height: 0; }
+.sidebar { width: 240px; flex-shrink: 0; border-right: 1px solid var(--border);
+  padding: 16px; overflow-y: auto; background: rgba(2,6,23,0.3); }
+.sidebar-title { font-size: .78rem; text-transform: uppercase; letter-spacing: .12em;
+  color: var(--muted); margin-bottom: 12px; }
+.cal-list { display: flex; flex-direction: column; gap: 4px; }
+.cal-row { display: flex; align-items: center; gap: 9px; padding: 7px 8px; border-radius: 8px; cursor: pointer; }
+.cal-row:hover { background: var(--panel); }
+.cal-row input { accent-color: var(--accent); width: 15px; height: 15px; }
+.dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+.cal-name { font-size: .9rem; }
+.admin-tools { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+
+.calendar-wrap { flex: 1; min-width: 0; padding: 18px; overflow: auto; }
+.fc { color: var(--text); }
+.fc .fc-toolbar-title { font-size: 1.15rem; }
+.fc .fc-button { text-transform: none; font-weight: 500; box-shadow: none !important; }
+.fc .fc-button-primary:not(:disabled).fc-button-active { color: var(--accent-ink); }
+.fc-daygrid-day-number, .fc-col-header-cell-cushion { color: var(--text); text-decoration: none; }
+.fc .fc-daygrid-day.fc-day-today { }
+.fc-event { border: none; cursor: pointer; }
+.fc a { color: inherit; }
+
 .muted { color: var(--muted); }
 .small { font-size: .82rem; }
+
+.modal { position: fixed; inset: 0; background: rgba(2,6,23,0.65); display: grid; place-items: center;
+  z-index: 50; padding: 20px; }
+.modal-card { position: relative; width: 100%; max-width: 420px; background: #0f1b2e;
+  border: 1px solid var(--border); border-radius: 14px; padding: 22px; }
+.modal-card h3 { margin-bottom: 6px; padding-right: 24px; }
+.modal-card p { margin-top: 8px; line-height: 1.5; }
+.modal-close { position: absolute; top: 10px; right: 12px; background: none; border: none;
+  color: var(--muted); font-size: 1.5rem; cursor: pointer; line-height: 1; }
+.modal-close:hover { color: var(--text); }
+
+@media (max-width: 760px) {
+  .app { flex-direction: column; }
+  .sidebar { width: auto; border-right: none; border-bottom: 1px solid var(--border); max-height: 38vh; }
+  .calendar-wrap { padding: 12px; }
+  .fc .fc-toolbar { flex-direction: column; gap: 8px; }
+  .fc .fc-toolbar-title { font-size: 1rem; }
+}
