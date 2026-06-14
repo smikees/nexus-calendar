@@ -20,7 +20,16 @@ foreach (visible_calendars() as $c) {
 }
 
 $u = current_user();
-json_out([
-    'calendars' => $out,
-    'user'      => $u ? ['email' => $u['email'], 'is_admin' => is_admin($u)] : null,
-]);
+$userOut = null;
+if ($u) {
+    $stmt = db()->prepare('SELECT email, display_name, avatar_url FROM users WHERE id = ?');
+    $stmt->execute([(int) $u['uid']]);
+    $row = $stmt->fetch() ?: [];
+    $userOut = [
+        'email'    => $row['email'] ?? $u['email'],
+        'name'     => $row['display_name'] ?? null,
+        'avatar'   => $row['avatar_url'] ?? null,
+        'is_admin' => is_admin($u),
+    ];
+}
+json_out(['calendars' => $out, 'user' => $userOut]);

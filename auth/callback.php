@@ -66,10 +66,10 @@ if ($uhttp !== 200 || empty($info['sub'])) {
 // Upsert the user, then issue the auth cookie.
 $pdo  = db();
 $stmt = $pdo->prepare(
-    'INSERT INTO users (google_sub, email, display_name) VALUES (?, ?, ?)
-     ON DUPLICATE KEY UPDATE email = VALUES(email), display_name = VALUES(display_name)'
+    'INSERT INTO users (google_sub, email, display_name, avatar_url) VALUES (?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE email = VALUES(email), display_name = VALUES(display_name), avatar_url = VALUES(avatar_url)'
 );
-$stmt->execute([$info['sub'], $info['email'] ?? '', $info['name'] ?? null]);
+$stmt->execute([$info['sub'], $info['email'] ?? '', $info['name'] ?? null, $info['picture'] ?? null]);
 
 $stmt = $pdo->prepare('SELECT * FROM users WHERE google_sub = ?');
 $stmt->execute([$info['sub']]);

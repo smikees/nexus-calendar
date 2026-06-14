@@ -21,7 +21,7 @@
     var root = document.documentElement;
     var btn = document.getElementById('mode-toggle');
     var sel = document.getElementById('theme-select');
-    sel.value = root.dataset.theme || 'sky';
+    sel.value = root.dataset.theme || 'slate';
     btn.addEventListener('click', function () {
       var m = (root.dataset.mode === 'dark') ? 'light' : 'dark';
       root.dataset.mode = m; localStorage.setItem(K.mode, m);
@@ -117,7 +117,9 @@
     var el = document.getElementById('auth');
     if (user) {
       var admin = user.is_admin ? ' <span class="muted small">· admin</span>' : '';
-      el.innerHTML = '<span class="user">' + esc(user.email) + '</span>' + admin +
+      var avatar = user.avatar ? '<img class="avatar" src="' + esc(user.avatar) + '" alt="" referrerpolicy="no-referrer">' : '';
+      var name = user.name || user.email;
+      el.innerHTML = avatar + '<span class="user">' + esc(name) + '</span>' + admin +
         ' <a class="btn small" href="/auth/logout.php">Log out</a>';
     } else {
       el.innerHTML = '<a class="btn primary small" href="/auth/login.php">Sign in with Google</a>';
@@ -153,6 +155,10 @@
       firstDay: 1,
       nowIndicator: true,
       dayMaxEvents: 3,
+      eventClassNames: function (arg) {
+        var s = arg.event.extendedProps.calendar;
+        return s ? ['evt-' + s] : [];
+      },
       headerToolbar: {
         left: 'prev,next today', center: 'title',
         right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'

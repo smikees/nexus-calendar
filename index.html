@@ -5,14 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>Nexus Calendar</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=p4-1">
   <script>
     (function () {
+      var allowed = ['slate', 'sand', 'forest', 'plum'];
       var r = document.documentElement;
       r.dataset.mode = localStorage.getItem('nc_mode_v1') || 'dark';
-      r.dataset.theme = localStorage.getItem('nc_theme_v1') || 'sky';
+      var t = localStorage.getItem('nc_theme_v1');
+      r.dataset.theme = (allowed.indexOf(t) >= 0) ? t : 'slate';
     })();
   </script>
-  <link rel="stylesheet" href="/assets/app.css?v=p3-4">
+  <link rel="stylesheet" href="/assets/app.css?v=p4-1">
   <script src="/assets/vendor/rrule.min.js"></script>
   <script src="/assets/vendor/fullcalendar.global.min.js"></script>
   <script src="/assets/vendor/fullcalendar-rrule.global.min.js"></script>
@@ -27,9 +30,10 @@
       <div class="theme-ctl">
         <button id="mode-toggle" class="icon-btn" title="Toggle light / dark" aria-label="Toggle light or dark mode">◐</button>
         <select id="theme-select" class="theme-select" title="Color theme" aria-label="Color theme">
-          <option value="sky">Sky</option>
-          <option value="violet">Violet</option>
-          <option value="emerald">Emerald</option>
+          <option value="slate">Slate</option>
+          <option value="sand">Sand</option>
+          <option value="forest">Forest</option>
+          <option value="plum">Plum</option>
         </select>
       </div>
       <div id="auth" class="auth"><span class="muted">…</span></div>
@@ -54,13 +58,4 @@
     <div class="modal-card">
       <button class="modal-close" id="modal-close" aria-label="Close">×</button>
       <h3 id="modal-title"></h3>
-      <p id="modal-cal" class="muted small"></p>
-      <p id="modal-when"></p>
-      <p id="modal-where" class="muted"></p>
-      <p id="modal-desc" class="muted small"></p>
-    </div>
-  </div>
-
-  <script src="/assets/app.js?v=p3-4"></script>
-</body>
-</html>
+      <p id="modal-cal" class="muted s
