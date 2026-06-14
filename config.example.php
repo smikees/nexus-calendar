@@ -7,8 +7,8 @@
 return [
     // --- Database (cPanel -> MySQL Databases) ---
     'db_host' => 'localhost',
-    'db_name' => 't2hu9otd1ek3_nexuscal',
-    'db_user' => 't2hu9otd1ek3_caluser',      // the DB user you create
+    'db_name' => 'nexuscal',
+    'db_user' => 'caluser',                  // the DB user you create
     'db_pass' => 'CHANGE_ME',                  // that user's password
 
     // --- Google OAuth (Google Cloud Console -> Credentials) ---
