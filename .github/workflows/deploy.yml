@@ -1,0 +1,32 @@
+name: Deploy to cal.stamih.com via FTP
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          # FTP account is scoped to the cal.stamih.com document root.
+          server-dir: ./
+          # Don't upload repo/CI metadata or local-only files.
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            README.md
+            stamih-infra.md
+            config.php
+            .env
+            **/*.log

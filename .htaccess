@@ -1,0 +1,7 @@
+Options -Indexes
+DirectoryIndex index.html index.php
+<Files "config.php">
+    Order Allow,Deny
+    Deny from all
+</Files>
+RedirectMatch 404 /\.git(/|$)

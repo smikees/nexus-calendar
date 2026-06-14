@@ -1,0 +1,13 @@
+# Local infra reference — never commit (contains cPanel account details)
+stamih-infra.md
+
+# Secrets / config
+config.php
+.env
+
+# Logs
+*.log
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
