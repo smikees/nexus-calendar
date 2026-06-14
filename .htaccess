@@ -5,3 +5,5 @@ DirectoryIndex index.html index.php
     Deny from all
 </Files>
 RedirectMatch 404 /\.git(/|$)
+RedirectMatch 404 ^/lib/
+RedirectMatch 404 \.sql$
