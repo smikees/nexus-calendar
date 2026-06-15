@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>Nexus Calendar</title>
-  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=p4-3">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=p4-4">
   <script>
     (function () {
       var allowed = ['slate', 'sand', 'forest', 'plum'];
@@ -15,7 +15,7 @@
       r.dataset.theme = (allowed.indexOf(t) >= 0) ? t : 'slate';
     })();
   </script>
-  <link rel="stylesheet" href="/assets/app.css?v=p4-3">
+  <link rel="stylesheet" href="/assets/app.css?v=p4-4">
   <script src="/assets/vendor/rrule.min.js"></script>
   <script src="/assets/vendor/fullcalendar.global.min.js"></script>
   <script src="/assets/vendor/fullcalendar-rrule.global.min.js"></script>
@@ -92,6 +92,38 @@
           <label>Starts<input type="date" id="ee-start-date"></label>
           <label>Ends<input type="date" id="ee-end-date"></label>
         </div>
+        <label>Repeat
+          <select id="ee-freq">
+            <option value="">Does not repeat</option>
+            <option value="DAILY">Daily</option>
+            <option value="WEEKLY">Weekly</option>
+            <option value="MONTHLY">Monthly</option>
+            <option value="YEARLY">Yearly</option>
+          </select>
+        </label>
+        <div id="ee-recur-opts" hidden>
+          <label class="inline-field">Every
+            <input type="number" id="ee-interval" min="1" max="999" value="1">
+            <span id="ee-interval-unit" class="unit">days</span>
+          </label>
+          <div id="ee-byday" class="weekday-row" hidden>
+            <button type="button" data-d="MO">M</button>
+            <button type="button" data-d="TU">T</button>
+            <button type="button" data-d="WE">W</button>
+            <button type="button" data-d="TH">T</button>
+            <button type="button" data-d="FR">F</button>
+            <button type="button" data-d="SA">S</button>
+            <button type="button" data-d="SU">S</button>
+          </div>
+          <div class="ends-block">
+            <span class="ends-title">Ends</span>
+            <label class="radio"><input type="radio" name="ee-end" value="never" checked> Never</label>
+            <label class="radio"><input type="radio" name="ee-end" value="count"> After
+              <input type="number" id="ee-count" min="1" max="999" value="10"> occurrences</label>
+            <label class="radio"><input type="radio" name="ee-end" value="until"> On date
+              <input type="date" id="ee-until"></label>
+          </div>
+        </div>
         <label>Location<input type="text" id="ee-location"></label>
         <label>Description<textarea id="ee-desc" rows="3"></textarea></label>
         <p class="form-error small" id="ee-error" hidden></p>
@@ -114,13 +146,14 @@
         <div class="field-pair">
           <label>Color<input type="color" id="ce-color" value="#5b9dd9"></label>
           <label>Icon
-            <span class="icon-field-wrap">
-              <input type="text" id="ce-icon" maxlength="4" placeholder="📅">
-              <button type="button" class="emoji-btn" id="ce-emoji-btn" title="Browse emojis" aria-label="Browse emojis">😀</button>
-            </span>
+            <button type="button" class="icon-pick-btn" id="ce-icon-btn" title="Choose an icon" aria-label="Choose an icon">📅</button>
+            <input type="hidden" id="ce-icon">
           </label>
         </div>
-        <div class="emoji-pop" id="ce-emoji-pop" hidden></div>
+        <div class="emoji-pop" id="ce-emoji-pop" hidden>
+          <input type="text" class="emoji-search" id="ce-emoji-search" placeholder="Search emojis…" autocomplete="off">
+          <div class="emoji-grid" id="ce-emoji-grid"></div>
+        </div>
         <p class="form-error small" id="ce-error" hidden></p>
         <div class="modal-actions">
           <button type="button" class="btn small danger" id="ce-delete" hidden>Delete</button>
@@ -147,6 +180,6 @@
 
   <div class="app-version" id="app-version"></div>
 
-  <script src="/assets/app.js?v=p4-3"></script>
+  <script src="/assets/app.js?v=p4-4"></script>
 </body>
 </html>

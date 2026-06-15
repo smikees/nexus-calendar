@@ -1,15 +1,64 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '0.4.0';
+  var APP_VERSION = '0.5.0';
   var K = {
     enabled: 'nc_enabled_v1', view: 'nc_view_v1', order: 'nc_order_v1',
     colors: 'nc_colors_v1', mode: 'nc_mode_v1', theme: 'nc_theme_v1',
     sidebar: 'nc_sidebar_w_v1'
   };
-  var EMOJIS = ('📅 📆 🗓️ ⏰ ⭐ 🔥 💼 🏠 🎉 🎂 🎓 ✈️ 🏖️ 🍽️ ☕ 🏃 🏋️ ⚽ 🏀 🎾 ' +
-    '🎮 🎸 🎬 🎨 📚 💡 💻 🔧 🩺 💊 💰 📈 📉 🧾 🛒 🐶 🐱 🌱 🌍 ☀️ ' +
-    '🌙 ❤️ 💙 💚 💜 🧡 💛 ✅ ❗ ❓ 📌 🔔 🎵 🍺 🍕 🎄').split(' ');
+  var EMOJIS = [
+    { e: '📅', k: 'calendar date schedule' }, { e: '📆', k: 'calendar date tearoff' },
+    { e: '🗓️', k: 'calendar spiral planner' }, { e: '⏰', k: 'alarm clock time reminder' },
+    { e: '⌚', k: 'watch time' }, { e: '⭐', k: 'star favorite important' },
+    { e: '🌟', k: 'star sparkle special' }, { e: '🔥', k: 'fire hot streak trending' },
+    { e: '💼', k: 'work business briefcase job' }, { e: '🏠', k: 'home house' },
+    { e: '🏢', k: 'office building work company' }, { e: '🎉', k: 'party celebration event' },
+    { e: '🎊', k: 'party confetti celebration' }, { e: '🎂', k: 'birthday cake' },
+    { e: '🎁', k: 'gift present birthday' }, { e: '🎓', k: 'graduation school education study' },
+    { e: '✈️', k: 'travel flight plane trip vacation' }, { e: '🏖️', k: 'beach vacation holiday travel' },
+    { e: '🏝️', k: 'island vacation travel' }, { e: '🗺️', k: 'map travel trip' },
+    { e: '🚗', k: 'car drive commute travel' }, { e: '🚆', k: 'train commute travel' },
+    { e: '🍽️', k: 'food dinner restaurant meal eat' }, { e: '☕', k: 'coffee break meeting cafe' },
+    { e: '🍺', k: 'beer drinks social happy hour' }, { e: '🍷', k: 'wine drinks dinner' },
+    { e: '🍕', k: 'pizza food lunch' }, { e: '🏃', k: 'run running exercise fitness sport' },
+    { e: '🏋️', k: 'gym workout fitness exercise weights' }, { e: '🧘', k: 'yoga meditation wellness health' },
+    { e: '⚽', k: 'soccer football sport' }, { e: '🏀', k: 'basketball sport' },
+    { e: '🏈', k: 'football sport' }, { e: '⚾', k: 'baseball sport' },
+    { e: '🎾', k: 'tennis sport' }, { e: '🏊', k: 'swimming sport pool' },
+    { e: '🚴', k: 'cycling bike sport' }, { e: '⛳', k: 'golf sport' },
+    { e: '🎮', k: 'gaming games play' }, { e: '🎲', k: 'games board dice' },
+    { e: '🎸', k: 'music guitar band concert' }, { e: '🎵', k: 'music note song' },
+    { e: '🎤', k: 'music sing karaoke concert' }, { e: '🎧', k: 'music headphones podcast' },
+    { e: '🎬', k: 'movie film cinema' }, { e: '🎨', k: 'art paint creative design' },
+    { e: '📷', k: 'photo camera picture' }, { e: '📚', k: 'books study reading learn' },
+    { e: '📖', k: 'book reading study' }, { e: '✏️', k: 'pencil write note edit' },
+    { e: '📝', k: 'note memo write task' }, { e: '💡', k: 'idea light tip lightbulb' },
+    { e: '💻', k: 'computer laptop work code' }, { e: '🖥️', k: 'computer desktop work' },
+    { e: '🔧', k: 'tools fix maintenance repair' }, { e: '🔨', k: 'hammer build tools' },
+    { e: '⚙️', k: 'settings gear config' }, { e: '🩺', k: 'doctor health medical appointment' },
+    { e: '💊', k: 'medicine pills health meds' }, { e: '🏥', k: 'hospital health medical' },
+    { e: '🦷', k: 'dentist teeth health' }, { e: '💰', k: 'money finance budget cash' },
+    { e: '💵', k: 'money cash dollar finance' }, { e: '💳', k: 'card payment finance money' },
+    { e: '📈', k: 'chart growth finance stocks up trending' }, { e: '📉', k: 'chart finance down loss stocks' },
+    { e: '📊', k: 'chart data analytics report' }, { e: '🧾', k: 'receipt bill invoice finance' },
+    { e: '🛒', k: 'shopping cart groceries buy' }, { e: '🛍️', k: 'shopping bags buy' },
+    { e: '🐶', k: 'dog pet animal' }, { e: '🐱', k: 'cat pet animal' },
+    { e: '🐾', k: 'pet paw animal vet' }, { e: '🌱', k: 'plant grow garden nature' },
+    { e: '🌳', k: 'tree nature outdoors' }, { e: '🌍', k: 'world earth global travel' },
+    { e: '☀️', k: 'sun weather sunny day' }, { e: '🌙', k: 'moon night' },
+    { e: '⛅', k: 'weather cloud partly' }, { e: '🌧️', k: 'rain weather' },
+    { e: '❄️', k: 'snow winter cold weather' }, { e: '❤️', k: 'love heart red favorite' },
+    { e: '💙', k: 'blue heart love' }, { e: '💚', k: 'green heart love' },
+    { e: '💜', k: 'purple heart love' }, { e: '🧡', k: 'orange heart love' },
+    { e: '💛', k: 'yellow heart love' }, { e: '✅', k: 'check done complete task ok' },
+    { e: '❗', k: 'important exclamation alert' }, { e: '❓', k: 'question help unknown' },
+    { e: '📌', k: 'pin important' }, { e: '📍', k: 'location pin place map' },
+    { e: '🔔', k: 'bell reminder notification alert' }, { e: '🎯', k: 'target goal focus objective' },
+    { e: '🚀', k: 'launch rocket startup project' }, { e: '🏆', k: 'trophy win award achievement' },
+    { e: '🎄', k: 'christmas holiday tree' }, { e: '🎃', k: 'halloween pumpkin holiday' },
+    { e: '💍', k: 'wedding ring engagement anniversary' }, { e: '👶', k: 'baby kids family' }
+  ];
   var calendarsById = {};
   var fc = null;
   var eeId = null;          // event id being edited (null = creating)
@@ -97,7 +146,10 @@
             '<button class="robtn" data-act="up" title="Move up">▲</button>' +
             '<button class="robtn" data-act="down" title="Move down">▼</button>' +
           '</span>' +
-          '<input type="checkbox" data-act="toggle"' + (enabled.has(slug) ? ' checked' : '') + '>' +
+          '<label class="cbx" style="--cal-color:' + esc(colorFor(slug)) + '" title="Show / hide">' +
+            '<input type="checkbox" data-act="toggle"' + (enabled.has(slug) ? ' checked' : '') + '>' +
+            '<span class="cbx-box"></span>' +
+          '</label>' +
           '<button class="dot" data-act="color" style="background:' + esc(colorFor(slug)) + '" title="Change color"></button>' +
           '<span class="cal-name">' + (c.icon ? esc(c.icon) + ' ' : '') + esc(c.name) + '</span>' +
           (c.canManage ? '<button class="robtn manage" data-act="manage" title="Manage / share">⚙</button>' : '') +
@@ -149,7 +201,7 @@
     var el = $('auth');
     if (user) {
       var admin = user.is_admin ? ' <span class="muted small">· admin</span>' : '';
-      var avatar = user.avatar ? '<img class="avatar" src="' + esc(user.avatar) + '" alt="" referrerpolicy="no-referrer">' : '';
+      var avatar = user.avatar ? '<img class="avatar" src="' + esc(user.avatar) + '" alt="" referrerpolicy="no-referrer" onerror="this.style.display=&#39;none&#39;">' : '';
       var name = user.name || user.email;
       el.innerHTML = avatar + '<span class="user">' + esc(name) + '</span>' + admin +
         ' <a class="btn small" href="/auth/logout.php">Log out</a>';
@@ -176,23 +228,34 @@
     $('modal-when').textContent = when;
     $('modal-where').textContent = p.location || '';
     $('modal-desc').textContent = p.description || '';
-    $('modal-actions').hidden = !(p.canEdit && !p.recurring);
+    $('modal-actions').hidden = !p.canEdit;
     $('event-modal').hidden = false;
   }
   function closeModal() { $('event-modal').hidden = true; }
 
   /* ---------- event editor ---------- */
   function normFromEvent(ev) {
+    var p = ev.extendedProps || {};
     var span = ev.allDay ? 86400000 : 3600000;
+    var start, endEx;
+    if (p.recurring && p.startUtc) {
+      // Edit the whole series from its base start, not the clicked occurrence.
+      start = ev.allDay ? new Date(String(p.startUtc).substr(0, 10) + 'T00:00:00') : new Date(p.startUtc);
+      endEx = ev.allDay ? new Date(String(p.endUtc).substr(0, 10) + 'T00:00:00') : new Date(p.endUtc);
+    } else {
+      start = ev.start;
+      endEx = ev.end || new Date(ev.start.getTime() + span);
+    }
     return {
       id: parseInt(ev.id, 10),
-      calendarId: ev.extendedProps.calendarId,
+      calendarId: p.calendarId,
       title: ev.title,
       allDay: ev.allDay,
-      start: ev.start,
-      endExclusive: ev.end || new Date(ev.start.getTime() + span),
-      location: ev.extendedProps.location,
-      description: ev.extendedProps.description
+      start: start,
+      endExclusive: endEx,
+      location: p.location,
+      description: p.description,
+      rrule: p.rruleBody || ''
     };
   }
   function toggleAllDayFields(on) {
@@ -233,6 +296,7 @@
     $('ee-desc').value = norm.description || '';
     $('ee-delete').hidden = !eeId;
     toggleAllDayFields(allday);
+    parseRRULE(norm.rrule || '');
     showErr('ee-error', '');
     $('event-editor').hidden = false;
     $('ee-title-input').focus();
@@ -248,7 +312,8 @@
     var allday = $('ee-allday').checked;
     var body = {
       title: title, calendar_id: calId, all_day: allday,
-      location: $('ee-location').value.trim(), description: $('ee-desc').value.trim()
+      location: $('ee-location').value.trim(), description: $('ee-desc').value.trim(),
+      rrule: buildRRULE()
     };
     if (allday) {
       var sd = $('ee-start-date').value;
@@ -304,7 +369,7 @@
     $('ce-heading').textContent = cal ? 'Edit calendar' : 'New calendar';
     $('ce-name').value = cal ? cal.name : '';
     $('ce-color').value = (cal && cal.color) ? cal.color : '#5b9dd9';
-    $('ce-icon').value = (cal && cal.icon) ? cal.icon : '';
+    setCalIcon(cal ? (cal.icon || '') : '📅'); // new calendars default to 📅
     $('ce-emoji-pop').hidden = true;
     $('ce-delete').hidden = !(cal && cal.owned);
     showErr('ce-error', '');
@@ -457,17 +522,105 @@
   }
 
   /* ---------- emoji picker ---------- */
-  function buildEmojiPicker() {
-    var pop = $('ce-emoji-pop');
-    if (pop.childElementCount) return;
-    EMOJIS.forEach(function (e) {
+  function setCalIcon(e) {
+    $('ce-icon').value = e || '';
+    $('ce-icon-btn').textContent = e || '📅';
+  }
+  function renderEmojiGrid(filter) {
+    var grid = $('ce-emoji-grid');
+    var q = (filter || '').trim().toLowerCase();
+    var items = EMOJIS.filter(function (it) { return !q || it.k.indexOf(q) >= 0 || it.e === q; });
+    grid.innerHTML = '';
+    if (!items.length) { grid.innerHTML = '<div class="none">No emojis match.</div>'; return; }
+    items.forEach(function (it) {
       var b = document.createElement('button');
-      b.type = 'button'; b.textContent = e;
-      b.addEventListener('click', function () {
-        $('ce-icon').value = e; pop.hidden = true;
-      });
-      pop.appendChild(b);
+      b.type = 'button'; b.textContent = it.e; b.title = it.k;
+      b.addEventListener('click', function () { setCalIcon(it.e); $('ce-emoji-pop').hidden = true; });
+      grid.appendChild(b);
     });
+  }
+  function toggleEmojiPicker() {
+    var pop = $('ce-emoji-pop');
+    var willShow = pop.hidden;
+    pop.hidden = !willShow;
+    if (willShow) {
+      $('ce-emoji-search').value = '';
+      renderEmojiGrid('');
+      setTimeout(function () { $('ce-emoji-search').focus(); }, 0);
+    }
+  }
+
+  /* ---------- recurrence (RRULE build / parse) ---------- */
+  var WEEKDAYS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+  function freqUnit(freq) {
+    return { DAILY: 'days', WEEKLY: 'weeks', MONTHLY: 'months', YEARLY: 'years' }[freq] || '';
+  }
+  function syncRecurUI() {
+    var freq = $('ee-freq').value;
+    $('ee-recur-opts').hidden = !freq;
+    $('ee-interval-unit').textContent = freqUnit(freq);
+    $('ee-byday').hidden = (freq !== 'WEEKLY');
+    if (freq === 'WEEKLY') {
+      // default to the start day's weekday if nothing selected
+      var anyOn = $('ee-byday').querySelector('button.on');
+      if (!anyOn) {
+        var d = $('ee-allday').checked ? new Date(($('ee-start-date').value || '') + 'T00:00:00')
+                                       : new Date($('ee-start').value);
+        if (!isNaN(d.getTime())) {
+          var idx = (d.getDay() + 6) % 7; // JS Sun=0 -> our MO=0
+          var btn = $('ee-byday').querySelector('button[data-d="' + WEEKDAYS[idx] + '"]');
+          if (btn) btn.classList.add('on');
+        }
+      }
+    }
+  }
+  function buildRRULE() {
+    var freq = $('ee-freq').value;
+    if (!freq) return '';
+    var parts = ['FREQ=' + freq];
+    var iv = parseInt($('ee-interval').value, 10);
+    if (iv > 1) parts.push('INTERVAL=' + iv);
+    if (freq === 'WEEKLY') {
+      var days = Array.prototype.map.call($('ee-byday').querySelectorAll('button.on'), function (b) { return b.dataset.d; });
+      if (days.length) parts.push('BYDAY=' + days.join(','));
+    }
+    var end = (document.querySelector('input[name="ee-end"]:checked') || {}).value;
+    if (end === 'count') {
+      var n = parseInt($('ee-count').value, 10); if (n > 0) parts.push('COUNT=' + n);
+    } else if (end === 'until') {
+      var u = $('ee-until').value;
+      if (u) parts.push('UNTIL=' + u.replace(/-/g, '') + 'T235959Z');
+    }
+    return parts.join(';');
+  }
+  function parseRRULE(body) {
+    // reset
+    $('ee-freq').value = '';
+    $('ee-interval').value = '1';
+    $('ee-count').value = '10';
+    $('ee-until').value = '';
+    Array.prototype.forEach.call($('ee-byday').querySelectorAll('button'), function (b) { b.classList.remove('on'); });
+    var never = document.querySelector('input[name="ee-end"][value="never"]'); if (never) never.checked = true;
+    if (body) {
+      var map = {};
+      body.split(';').forEach(function (kv) { var p = kv.split('='); if (p[0]) map[p[0].toUpperCase()] = p[1] || ''; });
+      if (map.FREQ) $('ee-freq').value = map.FREQ;
+      if (map.INTERVAL) $('ee-interval').value = map.INTERVAL;
+      if (map.BYDAY) {
+        map.BYDAY.split(',').forEach(function (d) {
+          var btn = $('ee-byday').querySelector('button[data-d="' + d + '"]'); if (btn) btn.classList.add('on');
+        });
+      }
+      if (map.COUNT) {
+        var c = document.querySelector('input[name="ee-end"][value="count"]'); if (c) c.checked = true;
+        $('ee-count').value = map.COUNT;
+      } else if (map.UNTIL) {
+        var u = document.querySelector('input[name="ee-end"][value="until"]'); if (u) u.checked = true;
+        var m = map.UNTIL.match(/^(\d{4})(\d{2})(\d{2})/);
+        if (m) $('ee-until').value = m[1] + '-' + m[2] + '-' + m[3];
+      }
+    }
+    syncRecurUI();
   }
 
   /* ---------- resizable sidebar ---------- */
@@ -530,9 +683,12 @@
     $('cal-editor').addEventListener('click', function (e) { if (e.target.id === 'cal-editor') closeCalEditor(); });
     $('ce-form').addEventListener('submit', saveCal);
     $('ce-delete').addEventListener('click', function () { deleteCal(ceId); });
-    $('ce-emoji-btn').addEventListener('click', function () {
-      buildEmojiPicker();
-      var p = $('ce-emoji-pop'); p.hidden = !p.hidden;
+    $('ce-icon-btn').addEventListener('click', toggleEmojiPicker);
+    $('ce-emoji-search').addEventListener('input', function () { renderEmojiGrid(this.value); });
+
+    $('ee-freq').addEventListener('change', syncRecurUI);
+    $('ee-byday').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-d]'); if (b) b.classList.toggle('on');
     });
     $('ce-share-list').addEventListener('click', function (e) {
       var b = e.target.closest('[data-share-id]'); if (!b) return;

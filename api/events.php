@@ -48,6 +48,8 @@ foreach ($stmt->fetchAll() as $e) {
     $recurring  = isset($e['rrule']) && $e['rrule'] !== null && $e['rrule'] !== '';
     // Drag/resize is allowed for editable, non-recurring events only.
     $canEdit    = isset($editable[(int) $e['calendar_id']]);
+    $startUtc   = $allDay ? substr($e['starts_at'], 0, 10) : str_replace(' ', 'T', $e['starts_at']) . 'Z';
+    $endUtc     = $allDay ? substr($e['ends_at'], 0, 10)   : str_replace(' ', 'T', $e['ends_at'])   . 'Z';
     $base = [
         'id'    => (int) $e['id'],
         'title' => $e['title'],
@@ -62,17 +64,26 @@ foreach ($stmt->fetchAll() as $e) {
             'description'  => $e['description'],
             'recurring'    => $recurring,
             'canEdit'      => $canEdit,
+            'startUtc'     => $startUtc,   // series base start (for editing recurring)
+            'endUtc'       => $endUtc,
+            'rruleBody'    => $recurring ? $e['rrule'] : '',
         ],
     ];
     if ($recurring) {
-        $s = new DateTime($e['starts_at'], new DateTimeZone('UTC'));
+        $s  = new DateTime($e['starts_at'], new DateTimeZone('UTC'));
         $en = new DateTime($e['ends_at'], new DateTimeZone('UTC'));
-        $dur = max(0, $en->getTimestamp() - $s->getTimestamp());
-        $base['rrule']    = 'DTSTART:' . $s->format('Ymd\THis\Z') . "\nRRULE:" . $e['rrule'];
-        $base['duration'] = sprintf('%02d:%02d', intdiv($dur, 3600), intdiv($dur % 3600, 60));
+        if ($allDay) {
+            $base['rrule'] = 'DTSTART;VALUE=DATE:' . $s->format('Ymd') . "\nRRULE:" . $e['rrule'];
+            $days = (int) max(1, round(($en->getTimestamp() - $s->getTimestamp()) / 86400));
+            if ($days > 1) { $base['duration'] = ['days' => $days]; }
+        } else {
+            $dur = max(0, $en->getTimestamp() - $s->getTimestamp());
+            $base['rrule']    = 'DTSTART:' . $s->format('Ymd\THis\Z') . "\nRRULE:" . $e['rrule'];
+            $base['duration'] = sprintf('%02d:%02d', intdiv($dur, 3600), intdiv($dur % 3600, 60));
+        }
     } else {
-        $base['start'] = $allDay ? substr($e['starts_at'], 0, 10) : str_replace(' ', 'T', $e['starts_at']) . 'Z';
-        $base['end']   = $allDay ? substr($e['ends_at'], 0, 10)   : str_replace(' ', 'T', $e['ends_at'])   . 'Z';
+        $base['start'] = $startUtc;
+        $base['end']   = $endUtc;
     }
     $events[] = $base;
 }

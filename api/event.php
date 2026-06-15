@@ -64,6 +64,19 @@ function shape_event(array $e): array {
     ];
 }
 
+/** Validate a recurrence rule body (without the "RRULE:" prefix). Empty => null. */
+function clean_rrule($v): ?string {
+    $v = strtoupper(trim((string) $v));
+    if ($v === '') {
+        return null;
+    }
+    $v = preg_replace('/^RRULE:/', '', $v);
+    if (!preg_match('#^[A-Z0-9;=,:/+\-]+$#', $v) || strpos($v, 'FREQ=') === false) {
+        json_out(['error' => 'bad_request', 'message' => 'Invalid recurrence rule.'], 400);
+    }
+    return $v;
+}
+
 /** Validate + normalise start/end from the request body. */
 function resolve_times(array $body): array {
     $allDay = !empty($body['all_day']);
@@ -105,16 +118,17 @@ if ($method === 'POST') {
         json_out(['error' => 'forbidden', 'message' => 'You cannot add events to this calendar.'], 403);
     }
     [$startUtc, $endUtc, $allDay] = resolve_times($body);
+    $rrule = array_key_exists('rrule', $body) ? clean_rrule($body['rrule']) : null;
 
     $stmt = $pdo->prepare(
-        'INSERT INTO events (calendar_id, uid, title, description, location, starts_at, ends_at, all_day, timezone)
-         VALUES (:cal, :uid, :title, :description, :location, :starts, :ends, :allday, "UTC")'
+        'INSERT INTO events (calendar_id, uid, title, description, location, starts_at, ends_at, all_day, rrule, timezone)
+         VALUES (:cal, :uid, :title, :description, :location, :starts, :ends, :allday, :rrule, "UTC")'
     );
     $stmt->execute([
         ':cal' => $calId, ':uid' => make_event_uid(), ':title' => mb_substr($title, 0, 500),
         ':description' => ($body['description'] ?? null) ?: null,
         ':location'    => ($body['location'] ?? null) ?: null,
-        ':starts' => $startUtc, ':ends' => $endUtc, ':allday' => $allDay,
+        ':starts' => $startUtc, ':ends' => $endUtc, ':allday' => $allDay, ':rrule' => $rrule,
     ]);
     json_out(['event' => shape_event(load_event((int) $pdo->lastInsertId()))], 201);
 }
@@ -125,9 +139,6 @@ if ($method === 'PATCH' || $method === 'PUT') {
         json_out(['error' => 'bad_request', 'message' => 'id is required'], 400);
     }
     $existing = load_event($id);
-    if ($existing['rrule'] !== null && $existing['rrule'] !== '') {
-        json_out(['error' => 'unsupported', 'message' => 'Recurring events cannot be edited yet.'], 422);
-    }
     if (!can_edit_calendar((int) $existing['calendar_id'])) {
         json_out(['error' => 'forbidden'], 403);
     }
@@ -143,6 +154,7 @@ if ($method === 'PATCH' || $method === 'PUT') {
     }
     if (array_key_exists('description', $body)) { $fields[] = 'description = ?'; $args[] = ($body['description'] ?: null); }
     if (array_key_exists('location', $body))    { $fields[] = 'location = ?';    $args[] = ($body['location'] ?: null); }
+    if (array_key_exists('rrule', $body))       { $fields[] = 'rrule = ?';       $args[] = clean_rrule($body['rrule']); }
 
     // Move to another calendar (must be able to edit the destination too).
     if (array_key_exists('calendar_id', $body)) {

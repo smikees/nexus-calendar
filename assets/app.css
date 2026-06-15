@@ -198,14 +198,46 @@ body.resizing-sidebar { cursor: col-resize; user-select: none; }
 /* Wider event editor so date rows never need a scrollbar. */
 #event-editor .modal-card { max-width: 560px; }
 
-/* Emoji picker for the calendar icon field. */
-.icon-field-wrap { display: flex; gap: 6px; align-items: stretch; }
-.icon-field-wrap input { flex: 1; }
-.emoji-btn { border: 1px solid var(--border); background: var(--card-bg); color: var(--text); border-radius: 8px; cursor: pointer; padding: 0 11px; font-size: 1.05rem; line-height: 1; }
-.emoji-btn:hover { border-color: var(--accent); }
-.emoji-pop { margin-top: 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); padding: 8px; display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; max-height: 184px; overflow-y: auto; }
-.emoji-pop button { border: none; background: none; cursor: pointer; font-size: 1.15rem; padding: 5px 0; border-radius: 6px; line-height: 1; }
-.emoji-pop button:hover { background: var(--panel); }
+/* Icon-as-button emoji picker. */
+.icon-pick-btn { width: 44px; height: 38px; border: 1px solid var(--border); background: var(--card-bg);
+  border-radius: 8px; cursor: pointer; font-size: 1.25rem; line-height: 1; padding: 0; }
+.icon-pick-btn:hover { border-color: var(--accent); }
+.emoji-pop { margin-top: 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); padding: 8px; }
+.emoji-search { width: 100%; background: var(--panel); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 9px; font-size: .85rem; margin-bottom: 8px; }
+.emoji-search:focus { outline: none; border-color: var(--accent); }
+.emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; max-height: 168px; overflow-y: auto; }
+.emoji-grid button { border: none; background: none; cursor: pointer; font-size: 1.2rem; padding: 5px 0; border-radius: 6px; line-height: 1; }
+.emoji-grid button:hover { background: var(--panel); }
+.emoji-grid .none { grid-column: 1 / -1; color: var(--muted); font-size: .8rem; text-align: center; padding: 10px; }
+
+/* Recurrence (repeat) controls. */
+.inline-field { flex-direction: row !important; align-items: center; gap: 8px; color: var(--text) !important; }
+.inline-field input[type="number"] { width: 72px; }
+.inline-field .unit { color: var(--muted); font-size: .85rem; }
+#ee-recur-opts { display: flex; flex-direction: column; gap: 11px; padding: 11px; margin-top: 2px;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+.weekday-row { display: flex; gap: 4px; }
+.weekday-row button { flex: 1; height: 30px; border: 1px solid var(--border); background: var(--card-bg);
+  color: var(--text); border-radius: 7px; cursor: pointer; font-size: .82rem; }
+.weekday-row button:hover { border-color: var(--accent); }
+.weekday-row button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.ends-block { display: flex; flex-direction: column; gap: 6px; }
+.ends-title { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.ends-block .radio { display: flex; align-items: center; gap: 6px; font-size: .88rem; color: var(--text); }
+.ends-block .radio input[type="number"] { width: 64px; }
+.ends-block .radio input[type="date"] { flex: 0 1 auto; }
+.ends-block input[type="radio"] { accent-color: var(--accent); }
+
+/* Calendar checkbox tinted to the calendar's own color. */
+.cbx { position: relative; display: inline-flex; align-items: center; cursor: pointer; flex-shrink: 0; }
+.cbx input { position: absolute; opacity: 0; width: 0; height: 0; }
+.cbx-box { width: 16px; height: 16px; border-radius: 4px; border: 2px solid var(--cal-color, var(--muted));
+  display: inline-block; position: relative; transition: background .12s; }
+.cbx input:checked + .cbx-box { background: var(--cal-color, var(--accent)); }
+.cbx input:checked + .cbx-box::after { content: ''; position: absolute; left: 4px; top: 1px; width: 3px; height: 7px;
+  border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.cbx input:focus-visible + .cbx-box { box-shadow: 0 0 0 2px var(--border); }
 
 /* Subtle app version marker, lower-left. */
 .app-version { position: fixed; left: 10px; bottom: 7px; font-size: .68rem; color: var(--muted);
