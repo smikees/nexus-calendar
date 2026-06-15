@@ -73,6 +73,8 @@
 
 /* ===================== LAYOUT ===================== */
 * { box-sizing: border-box; margin: 0; padding: 0; }
+/* The hidden attribute must always win, even over display:flex utility rules. */
+[hidden] { display: none !important; }
 html, body { height: 100%; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background: var(--bg-grad); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
@@ -80,7 +82,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helve
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 12px 18px; border-bottom: 1px solid var(--border); background: var(--topbar-bg);
   backdrop-filter: blur(8px); position: sticky; top: 0; z-index: 20; }
-.brand { display: flex; align-items: center; gap: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+.brand:hover .brand-mark { filter: brightness(1.08); }
+.brand:hover .brand-name { opacity: .85; }
 .brand-mark { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
   background: var(--accent); color: var(--accent-ink); font-weight: 800; }
 .brand-name strong { color: var(--accent); }
@@ -104,6 +108,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helve
 
 .app { flex: 1; display: flex; min-height: 0; }
 .sidebar { width: 250px; flex-shrink: 0; border-right: 1px solid var(--border); padding: 16px; overflow-y: auto; background: var(--sidebar-bg); }
+.sidebar-resizer { flex: 0 0 6px; cursor: col-resize; background: transparent; position: relative; }
+.sidebar-resizer::before { content: ''; position: absolute; left: 2px; top: 0; bottom: 0; width: 2px; background: var(--border); transition: background .15s; }
+.sidebar-resizer:hover::before, .sidebar-resizer.dragging::before { background: var(--accent); }
+body.resizing-sidebar { cursor: col-resize; user-select: none; }
 .sidebar-title { font-size: .78rem; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin-bottom: 12px; }
 .cal-list { display: flex; flex-direction: column; gap: 2px; }
 .cal-row { display: flex; align-items: center; gap: 7px; padding: 6px 6px; border-radius: 8px; }
@@ -186,6 +194,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helve
 .share-add { display: flex; gap: 6px; }
 .share-add input { flex: 1; background: var(--card-bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; font-size: .85rem; }
 .share-add select { background: var(--card-bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 7px 8px; font-size: .85rem; }
+
+/* Wider event editor so date rows never need a scrollbar. */
+#event-editor .modal-card { max-width: 560px; }
+
+/* Emoji picker for the calendar icon field. */
+.icon-field-wrap { display: flex; gap: 6px; align-items: stretch; }
+.icon-field-wrap input { flex: 1; }
+.emoji-btn { border: 1px solid var(--border); background: var(--card-bg); color: var(--text); border-radius: 8px; cursor: pointer; padding: 0 11px; font-size: 1.05rem; line-height: 1; }
+.emoji-btn:hover { border-color: var(--accent); }
+.emoji-pop { margin-top: 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); padding: 8px; display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; max-height: 184px; overflow-y: auto; }
+.emoji-pop button { border: none; background: none; cursor: pointer; font-size: 1.15rem; padding: 5px 0; border-radius: 6px; line-height: 1; }
+.emoji-pop button:hover { background: var(--panel); }
+
+/* Subtle app version marker, lower-left. */
+.app-version { position: fixed; left: 10px; bottom: 7px; font-size: .68rem; color: var(--muted);
+  opacity: .45; z-index: 30; pointer-events: none; letter-spacing: .03em; }
 
 @media (max-width: 760px) {
   .app { flex-direction: column; }

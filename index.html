@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>Nexus Calendar</title>
-  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=p4-2">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=p4-3">
   <script>
     (function () {
       var allowed = ['slate', 'sand', 'forest', 'plum'];
@@ -15,14 +15,14 @@
       r.dataset.theme = (allowed.indexOf(t) >= 0) ? t : 'slate';
     })();
   </script>
-  <link rel="stylesheet" href="/assets/app.css?v=p4-2">
+  <link rel="stylesheet" href="/assets/app.css?v=p4-3">
   <script src="/assets/vendor/rrule.min.js"></script>
   <script src="/assets/vendor/fullcalendar.global.min.js"></script>
   <script src="/assets/vendor/fullcalendar-rrule.global.min.js"></script>
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">
+    <div class="brand" id="brand-today" role="button" tabindex="0" title="Go to today">
       <span class="brand-mark">N</span>
       <span class="brand-name">Nexus <strong>Calendar</strong></span>
     </div>
@@ -52,6 +52,8 @@
         <a class="btn small" href="/admin/seed.php">Load sample data</a>
       </div>
     </aside>
+
+    <div class="sidebar-resizer" id="sidebar-resizer" title="Drag to resize"></div>
 
     <main class="calendar-wrap">
       <div id="calendar"></div>
@@ -111,8 +113,14 @@
         <label>Name<input type="text" id="ce-name" required></label>
         <div class="field-pair">
           <label>Color<input type="color" id="ce-color" value="#5b9dd9"></label>
-          <label>Icon<input type="text" id="ce-icon" maxlength="4" placeholder="📅"></label>
+          <label>Icon
+            <span class="icon-field-wrap">
+              <input type="text" id="ce-icon" maxlength="4" placeholder="📅">
+              <button type="button" class="emoji-btn" id="ce-emoji-btn" title="Browse emojis" aria-label="Browse emojis">😀</button>
+            </span>
+          </label>
         </div>
+        <div class="emoji-pop" id="ce-emoji-pop" hidden></div>
         <p class="form-error small" id="ce-error" hidden></p>
         <div class="modal-actions">
           <button type="button" class="btn small danger" id="ce-delete" hidden>Delete</button>
@@ -137,6 +145,8 @@
     </div>
   </div>
 
-  <script src="/assets/app.js?v=p4-2"></script>
+  <div class="app-version" id="app-version"></div>
+
+  <script src="/assets/app.js?v=p4-3"></script>
 </body>
 </html>

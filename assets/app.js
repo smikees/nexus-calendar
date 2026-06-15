@@ -1,10 +1,15 @@
 (function () {
   'use strict';
 
+  var APP_VERSION = '0.4.0';
   var K = {
     enabled: 'nc_enabled_v1', view: 'nc_view_v1', order: 'nc_order_v1',
-    colors: 'nc_colors_v1', mode: 'nc_mode_v1', theme: 'nc_theme_v1'
+    colors: 'nc_colors_v1', mode: 'nc_mode_v1', theme: 'nc_theme_v1',
+    sidebar: 'nc_sidebar_w_v1'
   };
+  var EMOJIS = ('📅 📆 🗓️ ⏰ ⭐ 🔥 💼 🏠 🎉 🎂 🎓 ✈️ 🏖️ 🍽️ ☕ 🏃 🏋️ ⚽ 🏀 🎾 ' +
+    '🎮 🎸 🎬 🎨 📚 💡 💻 🔧 🩺 💊 💰 📈 📉 🧾 🛒 🐶 🐱 🌱 🌍 ☀️ ' +
+    '🌙 ❤️ 💙 💚 💜 🧡 💛 ✅ ❗ ❓ 📌 🔔 🎵 🍺 🍕 🎄').split(' ');
   var calendarsById = {};
   var fc = null;
   var eeId = null;          // event id being edited (null = creating)
@@ -194,6 +199,12 @@
     $('ee-timed').hidden = on;
     $('ee-allday-fields').hidden = !on;
   }
+  // Tint the closed <select> to match the chosen calendar's color.
+  function paintCalSelect() {
+    var sel = $('ee-cal');
+    var opt = sel.options[sel.selectedIndex];
+    sel.style.color = opt ? opt.style.color : '';
+  }
   function openEventEditor(norm) {
     eeId = norm.id || null;
     $('ee-heading').textContent = eeId ? 'Edit event' : 'New event';
@@ -201,10 +212,13 @@
     var sel = $('ee-cal'); sel.innerHTML = '';
     editableCalendars().forEach(function (c) {
       var o = document.createElement('option');
-      o.value = c.id; o.textContent = (c.icon ? c.icon + ' ' : '') + c.name;
+      o.value = c.id;
+      o.textContent = '● ' + (c.icon ? c.icon + ' ' : '') + c.name;
+      o.style.color = colorFor(c.slug);           // colored swatch + label (Chrome/Edge)
       sel.appendChild(o);
     });
     if (norm.calendarId) sel.value = String(norm.calendarId);
+    paintCalSelect();
     var allday = !!norm.allDay;
     $('ee-allday').checked = allday;
     var start = norm.start || new Date();
@@ -291,6 +305,7 @@
     $('ce-name').value = cal ? cal.name : '';
     $('ce-color').value = (cal && cal.color) ? cal.color : '#5b9dd9';
     $('ce-icon').value = (cal && cal.icon) ? cal.icon : '';
+    $('ce-emoji-pop').hidden = true;
     $('ce-delete').hidden = !(cal && cal.owned);
     showErr('ce-error', '');
     var share = $('ce-share');
@@ -441,6 +456,56 @@
     requestAnimationFrame(function () { try { fc.updateSize(); } catch (e) {} });
   }
 
+  /* ---------- emoji picker ---------- */
+  function buildEmojiPicker() {
+    var pop = $('ce-emoji-pop');
+    if (pop.childElementCount) return;
+    EMOJIS.forEach(function (e) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.textContent = e;
+      b.addEventListener('click', function () {
+        $('ce-icon').value = e; pop.hidden = true;
+      });
+      pop.appendChild(b);
+    });
+  }
+
+  /* ---------- resizable sidebar ---------- */
+  function initSidebarResizer() {
+    var sidebar = document.querySelector('.sidebar');
+    var handle = $('sidebar-resizer');
+    if (!sidebar || !handle) return;
+    var saved = parseInt(localStorage.getItem(K.sidebar), 10);
+    if (saved >= 180 && saved <= 560) sidebar.style.width = saved + 'px';
+    var dragging = false;
+    function onMove(e) {
+      if (!dragging) return;
+      var x = (e.touches ? e.touches[0].clientX : e.clientX);
+      var w = Math.min(560, Math.max(180, x - sidebar.getBoundingClientRect().left));
+      sidebar.style.width = w + 'px';
+      if (fc) { try { fc.updateSize(); } catch (_) {} }
+    }
+    function stop() {
+      if (!dragging) return;
+      dragging = false;
+      handle.classList.remove('dragging');
+      document.body.classList.remove('resizing-sidebar');
+      localStorage.setItem(K.sidebar, String(parseInt(sidebar.style.width, 10) || 250));
+    }
+    function start(e) {
+      dragging = true;
+      handle.classList.add('dragging');
+      document.body.classList.add('resizing-sidebar');
+      e.preventDefault();
+    }
+    handle.addEventListener('mousedown', start);
+    handle.addEventListener('touchstart', start, { passive: false });
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('mouseup', stop);
+    document.addEventListener('touchend', stop);
+  }
+
   /* ---------- wiring ---------- */
   function wireModals() {
     $('modal-close').addEventListener('click', closeModal);
@@ -457,6 +522,7 @@
     $('event-editor').addEventListener('click', function (e) { if (e.target.id === 'event-editor') closeEditor(); });
     $('ee-form').addEventListener('submit', saveEvent);
     $('ee-allday').addEventListener('change', function () { toggleAllDayFields(this.checked); });
+    $('ee-cal').addEventListener('change', paintCalSelect);
     $('ee-delete').addEventListener('click', function () { deleteEvent(eeId); });
 
     $('ce-close').addEventListener('click', closeCalEditor);
@@ -464,6 +530,10 @@
     $('cal-editor').addEventListener('click', function (e) { if (e.target.id === 'cal-editor') closeCalEditor(); });
     $('ce-form').addEventListener('submit', saveCal);
     $('ce-delete').addEventListener('click', function () { deleteCal(ceId); });
+    $('ce-emoji-btn').addEventListener('click', function () {
+      buildEmojiPicker();
+      var p = $('ce-emoji-pop'); p.hidden = !p.hidden;
+    });
     $('ce-share-list').addEventListener('click', function (e) {
       var b = e.target.closest('[data-share-id]'); if (!b) return;
       api('DELETE', '/api/shares.php', { id: parseInt(b.dataset.shareId, 10) }).then(function (res) {
@@ -489,8 +559,15 @@
     });
     $('new-cal-btn').addEventListener('click', function () { openCalEditor(null); });
 
+    var brand = $('brand-today');
+    function goToday() { if (fc) fc.today(); }
+    brand.addEventListener('click', goToday);
+    brand.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goToday(); }
+    });
+
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') { closeModal(); closeEditor(); closeCalEditor(); }
+      if (e.key === 'Escape') { closeModal(); closeEditor(); closeCalEditor(); $('ce-emoji-pop').hidden = true; }
     });
   }
 
@@ -498,6 +575,8 @@
   function boot() {
     initTheme();
     wireModals();
+    initSidebarResizer();
+    $('app-version').textContent = 'v' + APP_VERSION;
     var listEl = $('calendar-list');
     listEl.addEventListener('click', onSidebarClick);
     listEl.addEventListener('change', onSidebarChange);
