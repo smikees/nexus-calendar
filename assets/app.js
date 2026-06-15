@@ -7,6 +7,9 @@
   };
   var calendarsById = {};
   var fc = null;
+  var eeId = null;          // event id being edited (null = creating)
+  var ceId = null;          // calendar id being edited (null = creating)
+  var ceShareCalId = null;  // calendar id whose shares are shown
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -15,12 +18,29 @@
   }
   function readJSON(k, fb) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? fb : v; } catch (e) { return fb; } }
   function writeJSON(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
+  function $(id) { return document.getElementById(id); }
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function toLocalInput(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+  function toDateInput(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function showErr(id, msg) { var el = $(id); el.textContent = msg || ''; el.hidden = !msg; }
+
+  /* ---------- API helper (sends CSRF header on writes) ---------- */
+  function api(method, path, body) {
+    var opts = { method: method, credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } };
+    if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    return fetch(path, opts).then(function (r) {
+      return r.json().then(
+        function (j) { return { ok: r.ok, status: r.status, data: j }; },
+        function () { return { ok: r.ok, status: r.status, data: {} }; }
+      );
+    });
+  }
 
   /* ---------- theme ---------- */
   function initTheme() {
     var root = document.documentElement;
-    var btn = document.getElementById('mode-toggle');
-    var sel = document.getElementById('theme-select');
+    var btn = $('mode-toggle');
+    var sel = $('theme-select');
     sel.value = root.dataset.theme || 'slate';
     btn.addEventListener('click', function () {
       var m = (root.dataset.mode === 'dark') ? 'light' : 'dark';
@@ -33,7 +53,7 @@
 
   /* ---------- ordering / colors / enabled ---------- */
   function orderedSlugs() {
-    var def = Object.keys(calendarsById);              // server priority order
+    var def = Object.keys(calendarsById);
     var stored = readJSON(K.order, null);
     if (!stored) return def.slice();
     var out = stored.filter(function (s) { return calendarsById[s]; });
@@ -50,10 +70,14 @@
     if (stored === null) return new Set(Object.keys(calendarsById));
     return new Set(stored);
   }
+  function editableCalendars() {
+    return orderedSlugs().map(function (s) { return calendarsById[s]; })
+      .filter(function (c) { return c && c.canEdit; });
+  }
 
   /* ---------- sidebar ---------- */
   function renderSidebar(user) {
-    var list = document.getElementById('calendar-list');
+    var list = $('calendar-list');
     var slugs = orderedSlugs();
     var enabled = enabledSet();
     if (!slugs.length) { list.innerHTML = '<p class="muted small">No calendars yet.</p>'; }
@@ -71,12 +95,13 @@
           '<input type="checkbox" data-act="toggle"' + (enabled.has(slug) ? ' checked' : '') + '>' +
           '<button class="dot" data-act="color" style="background:' + esc(colorFor(slug)) + '" title="Change color"></button>' +
           '<span class="cal-name">' + (c.icon ? esc(c.icon) + ' ' : '') + esc(c.name) + '</span>' +
+          (c.canManage ? '<button class="robtn manage" data-act="manage" title="Manage / share">⚙</button>' : '') +
           '<input type="color" class="color-input" hidden value="' + esc(colorFor(slug)) + '">';
         list.appendChild(row);
       });
     }
-    var admin = document.getElementById('admin-tools');
-    if (user && user.is_admin) admin.hidden = false;
+    $('user-tools').hidden = !user;
+    $('admin-tools').hidden = !(user && user.is_admin);
   }
 
   function onSidebarClick(ev) {
@@ -87,6 +112,8 @@
     var act = btn.dataset.act;
     if (act === 'color') {
       row.querySelector('.color-input').click();
+    } else if (act === 'manage') {
+      openCalEditor(calendarsById[slug]);
     } else if (act === 'up' || act === 'down') {
       var order = orderedSlugs(); var i = order.indexOf(slug);
       var j = act === 'up' ? i - 1 : i + 1;
@@ -114,7 +141,7 @@
 
   /* ---------- header auth ---------- */
   function renderHeader(user) {
-    var el = document.getElementById('auth');
+    var el = $('auth');
     if (user) {
       var admin = user.is_admin ? ' <span class="muted small">· admin</span>' : '';
       var avatar = user.avatar ? '<img class="avatar" src="' + esc(user.avatar) + '" alt="" referrerpolicy="no-referrer">' : '';
@@ -126,35 +153,239 @@
     }
   }
 
-  /* ---------- modal ---------- */
+  /* ---------- event detail modal ---------- */
   function openModal(info) {
-    var p = info.event.extendedProps || {};
-    document.getElementById('modal-title').textContent = info.event.title;
+    var ev = info.event;
+    var p = ev.extendedProps || {};
+    window._ncCurrent = ev;
+    $('modal-title').textContent = ev.title;
     var calLine = p.calendarName || '';
     if (p.recurring) calLine += ' · ↻ repeats';
-    document.getElementById('modal-cal').textContent = calLine;
-    var s = info.event.start, e = info.event.end;
-    var opts = info.event.allDay
+    $('modal-cal').textContent = calLine;
+    var s = ev.start, e = ev.end;
+    var opts = ev.allDay
       ? { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }
       : { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
     var when = s ? s.toLocaleString(undefined, opts) : '';
-    if (e && !info.event.allDay) when += ' – ' + e.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-    document.getElementById('modal-when').textContent = when;
-    document.getElementById('modal-where').textContent = p.location || '';
-    document.getElementById('modal-desc').textContent = p.description || '';
-    document.getElementById('event-modal').hidden = false;
+    if (e && !ev.allDay) when += ' – ' + e.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    $('modal-when').textContent = when;
+    $('modal-where').textContent = p.location || '';
+    $('modal-desc').textContent = p.description || '';
+    $('modal-actions').hidden = !(p.canEdit && !p.recurring);
+    $('event-modal').hidden = false;
   }
-  function closeModal() { document.getElementById('event-modal').hidden = true; }
+  function closeModal() { $('event-modal').hidden = true; }
+
+  /* ---------- event editor ---------- */
+  function normFromEvent(ev) {
+    var span = ev.allDay ? 86400000 : 3600000;
+    return {
+      id: parseInt(ev.id, 10),
+      calendarId: ev.extendedProps.calendarId,
+      title: ev.title,
+      allDay: ev.allDay,
+      start: ev.start,
+      endExclusive: ev.end || new Date(ev.start.getTime() + span),
+      location: ev.extendedProps.location,
+      description: ev.extendedProps.description
+    };
+  }
+  function toggleAllDayFields(on) {
+    $('ee-timed').hidden = on;
+    $('ee-allday-fields').hidden = !on;
+  }
+  function openEventEditor(norm) {
+    eeId = norm.id || null;
+    $('ee-heading').textContent = eeId ? 'Edit event' : 'New event';
+    $('ee-title-input').value = norm.title || '';
+    var sel = $('ee-cal'); sel.innerHTML = '';
+    editableCalendars().forEach(function (c) {
+      var o = document.createElement('option');
+      o.value = c.id; o.textContent = (c.icon ? c.icon + ' ' : '') + c.name;
+      sel.appendChild(o);
+    });
+    if (norm.calendarId) sel.value = String(norm.calendarId);
+    var allday = !!norm.allDay;
+    $('ee-allday').checked = allday;
+    var start = norm.start || new Date();
+    var endEx = norm.endExclusive || new Date(start.getTime() + 3600000);
+    $('ee-start').value = toLocalInput(start);
+    $('ee-end').value = toLocalInput(endEx);
+    $('ee-start-date').value = toDateInput(start);
+    var endIncl = new Date(endEx.getTime()); endIncl.setDate(endIncl.getDate() - 1);
+    if (endIncl < start) endIncl = new Date(start.getTime());
+    $('ee-end-date').value = toDateInput(endIncl);
+    $('ee-location').value = norm.location || '';
+    $('ee-desc').value = norm.description || '';
+    $('ee-delete').hidden = !eeId;
+    toggleAllDayFields(allday);
+    showErr('ee-error', '');
+    $('event-editor').hidden = false;
+    $('ee-title-input').focus();
+  }
+  function closeEditor() { $('event-editor').hidden = true; }
+
+  function saveEvent(e) {
+    e.preventDefault();
+    var title = $('ee-title-input').value.trim();
+    var calId = parseInt($('ee-cal').value, 10);
+    if (!title) { showErr('ee-error', 'Title is required.'); return; }
+    if (!calId) { showErr('ee-error', 'Pick a calendar.'); return; }
+    var allday = $('ee-allday').checked;
+    var body = {
+      title: title, calendar_id: calId, all_day: allday,
+      location: $('ee-location').value.trim(), description: $('ee-desc').value.trim()
+    };
+    if (allday) {
+      var sd = $('ee-start-date').value;
+      var ed = $('ee-end-date').value || sd;
+      if (!sd) { showErr('ee-error', 'Start date is required.'); return; }
+      body.start = sd;
+      var d = new Date(ed + 'T00:00:00'); d.setDate(d.getDate() + 1); // store exclusive end
+      body.end = toDateInput(d);
+    } else {
+      var sv = $('ee-start').value, ev2 = $('ee-end').value;
+      if (!sv) { showErr('ee-error', 'Start is required.'); return; }
+      body.start = new Date(sv).toISOString();
+      body.end = ev2 ? new Date(ev2).toISOString() : '';
+    }
+    var req = eeId
+      ? api('PATCH', '/api/event.php', Object.assign({ id: eeId }, body))
+      : api('POST', '/api/event.php', body);
+    req.then(function (res) {
+      if (!res.ok) { showErr('ee-error', (res.data && res.data.message) || 'Could not save event.'); return; }
+      closeEditor();
+      if (fc) fc.refetchEvents();
+    });
+  }
+
+  function deleteEvent(id) {
+    if (!id || !confirm('Delete this event?')) return;
+    api('DELETE', '/api/event.php', { id: id }).then(function (res) {
+      if (res.ok) { closeEditor(); closeModal(); if (fc) fc.refetchEvents(); }
+      else alert((res.data && res.data.message) || 'Could not delete event.');
+    });
+  }
+
+  /* ---------- drag / resize ---------- */
+  function patchTimes(info) {
+    var ev = info.event;
+    var body = { id: parseInt(ev.id, 10), all_day: ev.allDay };
+    if (ev.allDay) {
+      body.start = ev.startStr.substr(0, 10);
+      if (ev.endStr) { body.end = ev.endStr.substr(0, 10); }
+      else { var d = new Date(ev.start.getTime()); d.setDate(d.getDate() + 1); body.end = toDateInput(d); }
+    } else {
+      body.start = ev.start.toISOString();
+      body.end = (ev.end || new Date(ev.start.getTime() + 3600000)).toISOString();
+    }
+    api('PATCH', '/api/event.php', body).then(function (res) {
+      if (!res.ok) { info.revert(); alert((res.data && res.data.message) || 'Could not move event.'); }
+    });
+  }
+
+  /* ---------- calendar editor + sharing ---------- */
+  function openCalEditor(cal) {
+    ceId = cal ? cal.id : null;
+    $('ce-heading').textContent = cal ? 'Edit calendar' : 'New calendar';
+    $('ce-name').value = cal ? cal.name : '';
+    $('ce-color').value = (cal && cal.color) ? cal.color : '#5b9dd9';
+    $('ce-icon').value = (cal && cal.icon) ? cal.icon : '';
+    $('ce-delete').hidden = !(cal && cal.owned);
+    showErr('ce-error', '');
+    var share = $('ce-share');
+    if (cal && cal.canManage && cal.visibility === 'private') {
+      share.hidden = false; ceShareCalId = cal.id; loadShares(cal.id);
+    } else {
+      share.hidden = true; ceShareCalId = null;
+    }
+    $('cal-editor').hidden = false;
+    $('ce-name').focus();
+  }
+  function closeCalEditor() { $('cal-editor').hidden = true; }
+
+  function saveCal(e) {
+    e.preventDefault();
+    var name = $('ce-name').value.trim();
+    if (!name) { showErr('ce-error', 'Name is required.'); return; }
+    var body = { name: name, color: $('ce-color').value, icon: $('ce-icon').value.trim() };
+    var creating = !ceId;
+    var req = creating
+      ? api('POST', '/api/calendar.php', body)
+      : api('PATCH', '/api/calendar.php', Object.assign({ id: ceId }, body));
+    req.then(function (res) {
+      if (!res.ok) { showErr('ce-error', (res.data && res.data.message) || 'Could not save calendar.'); return; }
+      var newCal = res.data && res.data.calendar;
+      if (creating && newCal) {
+        var set = enabledSet(); set.add(newCal.slug); writeJSON(K.enabled, Array.from(set));
+      }
+      reloadCalendars().then(function () {
+        if (fc) fc.refetchEvents();
+        if (creating && newCal && calendarsById[newCal.slug]) {
+          openCalEditor(calendarsById[newCal.slug]); // reopen so user can share immediately
+        } else {
+          closeCalEditor();
+        }
+      });
+    });
+  }
+
+  function deleteCal(id) {
+    if (!id || !confirm('Delete this calendar and all of its events? This cannot be undone.')) return;
+    api('DELETE', '/api/calendar.php', { id: id }).then(function (res) {
+      if (res.ok) { closeCalEditor(); reloadCalendars().then(function () { if (fc) fc.refetchEvents(); }); }
+      else alert((res.data && res.data.message) || 'Could not delete calendar.');
+    });
+  }
+
+  function loadShares(calId) {
+    var list = $('ce-share-list');
+    list.innerHTML = '<p class="muted small">Loading…</p>';
+    api('GET', '/api/shares.php?calendar_id=' + calId).then(function (res) {
+      if (!res.ok) { list.innerHTML = '<p class="muted small">' + esc((res.data && res.data.message) || 'Could not load shares.') + '</p>'; return; }
+      var shares = (res.data && res.data.shares) || [];
+      if (!shares.length) { list.innerHTML = '<p class="muted small">Not shared with anyone yet.</p>'; return; }
+      list.innerHTML = '';
+      shares.forEach(function (s) {
+        var row = document.createElement('div');
+        row.className = 'share-row';
+        row.innerHTML =
+          '<span class="share-email">' + esc(s.email) + '</span>' +
+          '<span class="muted small">' + esc(s.role) + (s.accepted ? '' : ' · pending') + '</span>' +
+          '<button class="robtn" data-share-id="' + s.id + '" title="Remove access">✕</button>';
+        list.appendChild(row);
+      });
+    });
+  }
+
+  /* ---------- data load ---------- */
+  function reloadCalendars() {
+    return fetch('/api/calendars.php', { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        calendarsById = {};
+        (d.calendars || []).forEach(function (c) { calendarsById[c.slug] = c; });
+        window._ncUser = d.user;
+        renderHeader(d.user);
+        renderSidebar(d.user);
+      });
+  }
 
   /* ---------- calendar ---------- */
   function initCalendar() {
-    var el = document.getElementById('calendar');
+    var el = $('calendar');
     fc = new FullCalendar.Calendar(el, {
       initialView: localStorage.getItem(K.view) || 'dayGridMonth',
       height: 'auto',
       firstDay: 1,
       nowIndicator: true,
       dayMaxEvents: 3,
+      allDaySlot: true,
+      allDayText: 'all-day',
+      stickyHeaderDates: true,
+      editable: true,
+      selectable: true,
+      selectMirror: true,
       eventClassNames: function (arg) {
         var s = arg.event.extendedProps.calendar;
         return s ? ['evt-' + s] : [];
@@ -167,6 +398,14 @@
       eventOrder: 'order,start',
       datesSet: function (info) { localStorage.setItem(K.view, info.view.type); },
       eventClick: function (info) { info.jsEvent.preventDefault(); openModal(info); },
+      select: function (sel) {
+        var cals = editableCalendars();
+        if (!cals.length) { fc.unselect(); return; }
+        openEventEditor({ allDay: sel.allDay, start: sel.start, endExclusive: sel.end, calendarId: cals[0].id });
+        fc.unselect();
+      },
+      eventDrop: patchTimes,
+      eventResize: patchTimes,
       eventDidMount: function (info) {
         if (info.event.extendedProps.recurring) {
           var t = info.el.querySelector('.fc-event-title') || info.el.querySelector('.fc-list-event-title');
@@ -202,30 +441,75 @@
     requestAnimationFrame(function () { try { fc.updateSize(); } catch (e) {} });
   }
 
+  /* ---------- wiring ---------- */
+  function wireModals() {
+    $('modal-close').addEventListener('click', closeModal);
+    $('event-modal').addEventListener('click', function (e) { if (e.target.id === 'event-modal') closeModal(); });
+    $('modal-edit').addEventListener('click', function () {
+      if (window._ncCurrent) { closeModal(); openEventEditor(normFromEvent(window._ncCurrent)); }
+    });
+    $('modal-delete').addEventListener('click', function () {
+      if (window._ncCurrent) deleteEvent(parseInt(window._ncCurrent.id, 10));
+    });
+
+    $('ee-close').addEventListener('click', closeEditor);
+    $('ee-cancel').addEventListener('click', closeEditor);
+    $('event-editor').addEventListener('click', function (e) { if (e.target.id === 'event-editor') closeEditor(); });
+    $('ee-form').addEventListener('submit', saveEvent);
+    $('ee-allday').addEventListener('change', function () { toggleAllDayFields(this.checked); });
+    $('ee-delete').addEventListener('click', function () { deleteEvent(eeId); });
+
+    $('ce-close').addEventListener('click', closeCalEditor);
+    $('ce-cancel').addEventListener('click', closeCalEditor);
+    $('cal-editor').addEventListener('click', function (e) { if (e.target.id === 'cal-editor') closeCalEditor(); });
+    $('ce-form').addEventListener('submit', saveCal);
+    $('ce-delete').addEventListener('click', function () { deleteCal(ceId); });
+    $('ce-share-list').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-share-id]'); if (!b) return;
+      api('DELETE', '/api/shares.php', { id: parseInt(b.dataset.shareId, 10) }).then(function (res) {
+        if (res.ok && ceShareCalId) loadShares(ceShareCalId);
+      });
+    });
+    $('ce-share-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (!ceShareCalId) return;
+      var email = $('ce-share-email').value.trim();
+      var role = $('ce-share-role').value;
+      api('POST', '/api/shares.php', { calendar_id: ceShareCalId, email: email, role: role }).then(function (res) {
+        if (!res.ok) { showErr('ce-share-error', (res.data && res.data.message) || 'Could not add.'); return; }
+        $('ce-share-email').value = ''; showErr('ce-share-error', ''); loadShares(ceShareCalId);
+      });
+    });
+
+    $('new-event-btn').addEventListener('click', function () {
+      var cals = editableCalendars();
+      if (!cals.length) { alert('Create a calendar first, then add events to it.'); return; }
+      var s = new Date(); s.setMinutes(0, 0, 0); s.setHours(s.getHours() + 1);
+      openEventEditor({ start: s, endExclusive: new Date(s.getTime() + 3600000), calendarId: cals[0].id, allDay: false });
+    });
+    $('new-cal-btn').addEventListener('click', function () { openCalEditor(null); });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { closeModal(); closeEditor(); closeCalEditor(); }
+    });
+  }
+
   /* ---------- boot ---------- */
   function boot() {
-  initTheme();
-  document.getElementById('modal-close').addEventListener('click', closeModal);
-  document.getElementById('event-modal').addEventListener('click', function (e) {
-    if (e.target.id === 'event-modal') closeModal();
-  });
-  var listEl = document.getElementById('calendar-list');
-  listEl.addEventListener('click', onSidebarClick);
-  listEl.addEventListener('change', onSidebarChange);
+    initTheme();
+    wireModals();
+    var listEl = $('calendar-list');
+    listEl.addEventListener('click', onSidebarClick);
+    listEl.addEventListener('change', onSidebarChange);
 
-  fetch('/api/calendars.php', { credentials: 'same-origin' })
-    .then(function (r) { return r.json(); })
-    .then(function (d) {
-      (d.calendars || []).forEach(function (c) { calendarsById[c.slug] = c; });
-      window._ncUser = d.user;
-      renderHeader(d.user);
-      renderSidebar(d.user);
-      initCalendar();
-      if (location.search.indexOf('seeded=1') !== -1) history.replaceState({}, '', '/');
-    })
-    .catch(function () {
-      document.getElementById('calendar-list').innerHTML = '<p class="muted small">Could not load calendars.</p>';
-    });
+    reloadCalendars()
+      .then(function () {
+        initCalendar();
+        if (location.search.indexOf('seeded=1') !== -1) history.replaceState({}, '', '/');
+      })
+      .catch(function () {
+        $('calendar-list').innerHTML = '<p class="muted small">Could not load calendars.</p>';
+      });
   }
   if (document.readyState === 'complete') boot();
   else window.addEventListener('load', boot);

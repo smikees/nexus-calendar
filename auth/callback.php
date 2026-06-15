@@ -86,6 +86,18 @@ $stmt = $pdo->prepare('SELECT * FROM users WHERE google_sub = ?');
 $stmt->execute([$info['sub']]);
 $user = $stmt->fetch();
 
+// Claim any calendar shares addressed to this email but not yet linked to a user.
+// Defensive: the calendar_shares table is added by a manual migration.
+try {
+    $claim = $pdo->prepare(
+        'UPDATE calendar_shares SET shared_with_user_id = ?
+         WHERE shared_with_user_id IS NULL AND LOWER(shared_with_email) = ?'
+    );
+    $claim->execute([(int) $user['id'], strtolower((string) ($user['email'] ?? ''))]);
+} catch (PDOException $e) {
+    // calendar_shares not present yet; ignore.
+}
+
 issue_auth_cookie($user);
 header('Location: /');
 exit;

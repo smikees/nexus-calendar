@@ -277,4 +277,27 @@ representations (UI / iCal / JSON).
 
 ## 12. Notifications & PWA
 
-- Instal
+- Installable via Web App Manifest.
+- Service worker caches the app shell (works on flaky connections) and shows
+  notifications for upcoming events the client already knows about, scheduled while the
+  app is open/installed. No server push, no cron — matches the hosting constraints.
+- Notifications are opt-in (explicit permission request), per the platform rules.
+
+---
+
+## 13. Security
+
+- `config.php` denied by `.htaccess`; `.git` blocked; `Options -Indexes`.
+- All DB access via PDO prepared statements.
+- Every write checks ownership/admin; CSRF state on the OAuth round-trip.
+- Private `.ics` reachable only via unguessable `feed_token`.
+- Validate and bound `from`/`to` windows to cap recurrence-expansion cost.
+
+---
+
+## 14. Deferred / future (explicitly out of scope for v1)
+
+- Automated ingestion of public data (earnings, Fed, fixtures) — manual curation for now.
+- True background web push (VAPID + cron).
+- Sharing private calendars between users; collaborative editing.
+- Natural-language summary endpoint on top of `/api/calendar.json`.

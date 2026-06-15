@@ -40,21 +40,28 @@ $sql = "SELECT e.*, c.slug AS cal_slug, c.color AS cal_color, c.name AS cal_name
 $stmt = db()->prepare($sql);
 $stmt->execute(array_merge($slugs, [$toUtc, $toUtc, $fromUtc]));
 
+$editable = editable_calendar_ids();
+
 $events = [];
 foreach ($stmt->fetchAll() as $e) {
     $allDay     = (int) $e['all_day'] === 1;
     $recurring  = isset($e['rrule']) && $e['rrule'] !== null && $e['rrule'] !== '';
+    // Drag/resize is allowed for editable, non-recurring events only.
+    $canEdit    = isset($editable[(int) $e['calendar_id']]);
     $base = [
         'id'    => (int) $e['id'],
         'title' => $e['title'],
         'color' => $e['cal_color'],
         'allDay'=> $allDay,
+        'editable' => $canEdit && !$recurring,
         'extendedProps' => [
             'calendar'     => $e['cal_slug'],
+            'calendarId'   => (int) $e['calendar_id'],
             'calendarName' => $e['cal_name'],
             'location'     => $e['location'],
             'description'  => $e['description'],
             'recurring'    => $recurring,
+            'canEdit'      => $canEdit,
         ],
     ];
     if ($recurring) {

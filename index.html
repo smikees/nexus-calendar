@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>Nexus Calendar</title>
-  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=p4-1">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=p4-2">
   <script>
     (function () {
       var allowed = ['slate', 'sand', 'forest', 'plum'];
@@ -15,7 +15,7 @@
       r.dataset.theme = (allowed.indexOf(t) >= 0) ? t : 'slate';
     })();
   </script>
-  <link rel="stylesheet" href="/assets/app.css?v=p4-1">
+  <link rel="stylesheet" href="/assets/app.css?v=p4-2">
   <script src="/assets/vendor/rrule.min.js"></script>
   <script src="/assets/vendor/fullcalendar.global.min.js"></script>
   <script src="/assets/vendor/fullcalendar-rrule.global.min.js"></script>
@@ -44,6 +44,10 @@
     <aside class="sidebar">
       <h2 class="sidebar-title">Calendars</h2>
       <div id="calendar-list" class="cal-list"><p class="muted small">Loading…</p></div>
+      <div id="user-tools" class="user-tools" hidden>
+        <button class="btn small" id="new-event-btn" type="button">＋ New event</button>
+        <button class="btn small" id="new-cal-btn" type="button">＋ New calendar</button>
+      </div>
       <div id="admin-tools" class="admin-tools" hidden>
         <a class="btn small" href="/admin/seed.php">Load sample data</a>
       </div>
@@ -62,9 +66,77 @@
       <p id="modal-when"></p>
       <p id="modal-where" class="muted"></p>
       <p id="modal-desc" class="muted small"></p>
+      <div class="modal-actions" id="modal-actions" hidden>
+        <span class="spacer"></span>
+        <button class="btn small danger" id="modal-delete" type="button">Delete</button>
+        <button class="btn primary small" id="modal-edit" type="button">Edit</button>
+      </div>
     </div>
   </div>
 
-  <script src="/assets/app.js?v=p4-1"></script>
+  <div id="event-editor" class="modal" hidden>
+    <div class="modal-card">
+      <button class="modal-close" id="ee-close" aria-label="Close">×</button>
+      <h3 id="ee-heading">New event</h3>
+      <form id="ee-form" class="form">
+        <label>Title<input type="text" id="ee-title-input" required></label>
+        <label>Calendar<select id="ee-cal"></select></label>
+        <label class="checkbox"><input type="checkbox" id="ee-allday"> All day</label>
+        <div id="ee-timed" class="field-pair">
+          <label>Starts<input type="datetime-local" id="ee-start"></label>
+          <label>Ends<input type="datetime-local" id="ee-end"></label>
+        </div>
+        <div id="ee-allday-fields" class="field-pair" hidden>
+          <label>Starts<input type="date" id="ee-start-date"></label>
+          <label>Ends<input type="date" id="ee-end-date"></label>
+        </div>
+        <label>Location<input type="text" id="ee-location"></label>
+        <label>Description<textarea id="ee-desc" rows="3"></textarea></label>
+        <p class="form-error small" id="ee-error" hidden></p>
+        <div class="modal-actions">
+          <button type="button" class="btn small danger" id="ee-delete" hidden>Delete</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn small" id="ee-cancel">Cancel</button>
+          <button type="submit" class="btn primary small">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="cal-editor" class="modal" hidden>
+    <div class="modal-card">
+      <button class="modal-close" id="ce-close" aria-label="Close">×</button>
+      <h3 id="ce-heading">New calendar</h3>
+      <form id="ce-form" class="form">
+        <label>Name<input type="text" id="ce-name" required></label>
+        <div class="field-pair">
+          <label>Color<input type="color" id="ce-color" value="#5b9dd9"></label>
+          <label>Icon<input type="text" id="ce-icon" maxlength="4" placeholder="📅"></label>
+        </div>
+        <p class="form-error small" id="ce-error" hidden></p>
+        <div class="modal-actions">
+          <button type="button" class="btn small danger" id="ce-delete" hidden>Delete</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn small" id="ce-cancel">Cancel</button>
+          <button type="submit" class="btn primary small">Save</button>
+        </div>
+      </form>
+      <div id="ce-share" class="share-section" hidden>
+        <h4>Sharing</h4>
+        <div id="ce-share-list" class="share-list"></div>
+        <form id="ce-share-form" class="share-add">
+          <input type="email" id="ce-share-email" placeholder="email@example.com" required>
+          <select id="ce-share-role">
+            <option value="viewer">Viewer</option>
+            <option value="editor">Editor</option>
+          </select>
+          <button type="submit" class="btn small">Add</button>
+        </form>
+        <p class="form-error small" id="ce-share-error" hidden></p>
+      </div>
+    </div>
+  </div>
+
+  <script src="/assets/app.js?v=p4-2"></script>
 </body>
 </html>

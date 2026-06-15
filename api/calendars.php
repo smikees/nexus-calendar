@@ -2,12 +2,22 @@
 declare(strict_types=1);
 require_once __DIR__ . '/../lib/calendars.php';
 
+$u        = current_user();
+$isAdmin  = $u ? is_admin($u) : false;
+$editable = editable_calendar_ids();
+$shared   = $u ? shared_calendar_roles() : [];
+
 $prefs = user_prefs();
 $out   = [];
 foreach (visible_calendars() as $c) {
-    $p = $prefs[(int) $c['id']] ?? null;
+    $cid   = (int) $c['id'];
+    $p     = $prefs[$cid] ?? null;
+    $owned = $u && (int) $c['owner_user_id'] === (int) $u['uid'];
+    $role  = $owned ? 'owner'
+           : (($isAdmin && $c['visibility'] === 'public') ? 'admin'
+           : ($shared[$cid] ?? ($c['visibility'] === 'public' ? 'public' : 'viewer')));
     $out[] = [
-        'id'         => (int) $c['id'],
+        'id'         => $cid,
         'slug'       => $c['slug'],
         'name'       => $c['name'],
         'color'      => $p['color_override'] ?? $c['color'],
@@ -16,10 +26,13 @@ foreach (visible_calendars() as $c) {
         'priority'   => $p['priority_override'] !== null && $p !== null
                         ? (int) $p['priority_override'] : (int) $c['default_priority'],
         'enabled'    => $p ? ((int) $p['enabled'] === 1) : true,
+        'owned'      => $owned,
+        'role'       => $role,
+        'canEdit'    => isset($editable[$cid]),
+        'canManage'  => $owned || ($isAdmin && $c['visibility'] === 'public'),
     ];
 }
 
-$u = current_user();
 $userOut = null;
 if ($u) {
     $row = [];

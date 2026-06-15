@@ -93,3 +93,7 @@ account settings). Everything after this I can build and deploy.
 
 ## Risks / watch-items
 - **No cron/background** → notifications are client-side only (accepted in v1).
+- **Recurrence cost** → always bound the query window server-side.
+- **utf8mb4** → enforce on every table + the PDO DSN (per infra lesson) to avoid `????`.
+- **Composer in CI** → keep `vendor/` out of git; let the Action build it, FTP upload it.
+- **Mount truncation** (seen during setup) → validate any file copied through the mount before deploy.
