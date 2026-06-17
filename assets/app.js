@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '0.6.3';
+  var APP_VERSION = '0.7.0';
   var K = {
     enabled: 'nc_enabled_v1', view: 'nc_view_v1', order: 'nc_order_v1',
     colors: 'nc_colors_v1', mode: 'nc_mode_v1', theme: 'nc_theme_v1',
@@ -65,6 +65,7 @@
   var eeSaving = false;     // in-flight save guard (prevents duplicate events)
   var ceId = null;          // calendar id being edited (null = creating)
   var ceShareCalId = null;  // calendar id whose shares are shown
+  var ceFeedCalId = null;   // calendar id of the feed subscription being managed
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -421,10 +422,121 @@
     } else {
       share.hidden = true; ceShareCalId = null;
     }
+    var feed = $('ce-feed');
+    if (cal && cal.isFeed) {
+      feed.hidden = false;
+      ceFeedCalId = cal.id;
+      $('ce-feed-url').textContent = cal.feedUrl || '';
+      $('ce-feed-synced').textContent = cal.feedLastSynced ? ('Last synced ' + relTime(cal.feedLastSynced)) : 'Not synced yet';
+      showErr('ce-feed-error', '');
+    } else {
+      feed.hidden = true; ceFeedCalId = null;
+    }
     $('cal-editor').hidden = false;
     $('ce-name').focus();
   }
   function closeCalEditor() { $('cal-editor').hidden = true; }
+
+  /* ---------- import / subscribe ---------- */
+  function relTime(s) {
+    try {
+      var d = new Date(String(s).replace(' ', 'T') + 'Z');
+      var sec = Math.round((Date.now() - d.getTime()) / 1000);
+      if (sec < 60) return 'just now';
+      var m = Math.round(sec / 60); if (m < 60) return m + ' min ago';
+      var h = Math.round(m / 60); if (h < 24) return h + 'h ago';
+      return Math.round(h / 24) + 'd ago';
+    } catch (e) { return ''; }
+  }
+  function setImportMode(mode) {
+    Array.prototype.forEach.call($('im-seg').querySelectorAll('.seg-btn'), function (b) {
+      b.classList.toggle('on', b.dataset.mode === mode);
+    });
+    $('im-url-form').hidden = (mode !== 'url');
+    $('im-file-form').hidden = (mode !== 'file');
+  }
+  function toggleImportFileName() { $('im-file-name-wrap').hidden = ($('im-file-target').value !== '__new__'); }
+  function openImportModal() {
+    setImportMode('url');
+    $('im-url').value = ''; $('im-url-name').value = ''; $('im-url-color').value = '#5b9dd9';
+    $('im-file').value = ''; $('im-file-name').value = '';
+    showErr('im-url-error', ''); showErr('im-file-error', '');
+    var sel = $('im-file-target'); sel.innerHTML = '';
+    var optNew = document.createElement('option'); optNew.value = '__new__'; optNew.textContent = '＋ New calendar…'; sel.appendChild(optNew);
+    editableCalendars().forEach(function (c) {
+      var o = document.createElement('option'); o.value = c.id; o.textContent = (c.icon ? c.icon + ' ' : '') + c.name; sel.appendChild(o);
+    });
+    toggleImportFileName();
+    $('import-modal').hidden = false;
+    setTimeout(function () { $('im-url').focus(); }, 0);
+  }
+  function closeImportModal() { $('import-modal').hidden = true; }
+
+  // After a successful import/subscribe: reload calendars, enable + show the new one.
+  function afterImport(slug, msg) {
+    return reloadCalendars().then(function () {
+      if (slug) { var set = enabledSet(); set.add(slug); writeJSON(K.enabled, Array.from(set)); renderSidebar(window._ncUser); }
+      if (fc) fc.refetchEvents();
+      closeImportModal();
+      if (msg) alert(msg);
+    });
+  }
+  function submitSubscribe(e) {
+    e.preventDefault();
+    var url = $('im-url').value.trim();
+    if (!url) { showErr('im-url-error', 'Enter a feed URL.'); return; }
+    var btn = $('im-url-submit'); btn.disabled = true; showErr('im-url-error', '');
+    api('POST', '/api/subscribe.php', { feed_url: url, name: $('im-url-name').value.trim(), color: $('im-url-color').value })
+      .then(function (res) {
+        btn.disabled = false;
+        if (!res.ok) { showErr('im-url-error', (res.data && res.data.message) || 'Could not subscribe to that feed.'); return; }
+        afterImport(res.data && res.data.slug, 'Subscribed — imported ' + (res.data && res.data.imported) + ' events.');
+      });
+  }
+  function submitFileImport(e) {
+    e.preventDefault();
+    var file = $('im-file').files[0];
+    if (!file) { showErr('im-file-error', 'Choose an .ics file.'); return; }
+    var fd = new FormData(); fd.append('file', file);
+    var target = $('im-file-target').value;
+    if (target === '__new__') {
+      var nm = $('im-file-name').value.trim();
+      if (!nm) { showErr('im-file-error', 'Enter a name for the new calendar.'); return; }
+      fd.append('name', nm);
+    } else { fd.append('calendar_id', target); }
+    var btn = $('im-file-submit'); btn.disabled = true; showErr('im-file-error', '');
+    // Note: no Content-Type header — the browser sets the multipart boundary.
+    fetch('/api/import.php', { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' }, body: fd })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, data: j }; }, function () { return { ok: r.ok, data: {} }; }); })
+      .then(function (res) {
+        btn.disabled = false;
+        if (!res.ok) { showErr('im-file-error', (res.data && res.data.message) || 'Could not import that file.'); return; }
+        afterImport(res.data && res.data.slug, 'Imported ' + (res.data && res.data.imported) + ' events.');
+      });
+  }
+  function refreshFeed() {
+    if (!ceFeedCalId) return;
+    var btn = $('ce-feed-refresh'); btn.disabled = true; showErr('ce-feed-error', '');
+    api('POST', '/api/feed_sync.php', { calendar_id: ceFeedCalId }).then(function (res) {
+      btn.disabled = false;
+      if (!res.ok) { showErr('ce-feed-error', (res.data && res.data.message) || 'Refresh failed.'); return; }
+      $('ce-feed-synced').textContent = 'Last synced just now';
+      reloadCalendars().then(function () { if (fc) fc.refetchEvents(); });
+    });
+  }
+  // Lazily re-sync subscribed calendars whose feed has gone stale (no host cron needed).
+  function syncStaleFeeds() {
+    var due = Array.from(enabledSet())
+      .map(function (s) { return calendarsById[s]; })
+      .filter(function (c) { return c && c.isFeed && c.feedStale && c.owned; });
+    if (!due.length) return;
+    var done = 0;
+    due.forEach(function (c) {
+      api('POST', '/api/feed_sync.php', { calendar_id: c.id }).then(function () {
+        if (++done === due.length && fc) fc.refetchEvents();
+      }).catch(function () {});
+    });
+  }
 
   function saveCal(e) {
     e.preventDefault();
@@ -844,6 +956,15 @@
     });
     $('new-cal-btn').addEventListener('click', function () { openCalEditor(null); });
 
+    $('import-btn').addEventListener('click', openImportModal);
+    $('im-close').addEventListener('click', closeImportModal);
+    $('import-modal').addEventListener('click', function (e) { if (e.target.id === 'import-modal') closeImportModal(); });
+    $('im-seg').addEventListener('click', function (e) { var b = e.target.closest('.seg-btn'); if (b) setImportMode(b.dataset.mode); });
+    $('im-url-form').addEventListener('submit', submitSubscribe);
+    $('im-file-form').addEventListener('submit', submitFileImport);
+    $('im-file-target').addEventListener('change', toggleImportFileName);
+    $('ce-feed-refresh').addEventListener('click', refreshFeed);
+
     var brand = $('brand-today');
     function goToday() { if (fc) { fc.changeView('timeGridDay'); fc.today(); } }
     brand.addEventListener('click', goToday);
@@ -852,7 +973,7 @@
     });
 
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') { closeModal(); closeEditor(); closeCalEditor(); $('ce-emoji-pop').hidden = true; $('ee-emoji-pop').hidden = true; }
+      if (e.key === 'Escape') { closeModal(); closeEditor(); closeCalEditor(); closeImportModal(); $('ce-emoji-pop').hidden = true; $('ee-emoji-pop').hidden = true; }
     });
   }
 
@@ -873,6 +994,7 @@
     reloadCalendars()
       .then(function () {
         initCalendar();
+        syncStaleFeeds();
         if (location.search.indexOf('seeded=1') !== -1) history.replaceState({}, '', '/');
       })
       .catch(function () {

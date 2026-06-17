@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>Nexus Calendar</title>
-  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=p5-5">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=p6-1">
   <script>
     (function () {
       var allowed = ['slate', 'sand', 'forest', 'plum'];
@@ -15,7 +15,7 @@
       r.dataset.theme = (allowed.indexOf(t) >= 0) ? t : 'slate';
     })();
   </script>
-  <link rel="stylesheet" href="/assets/app.css?v=p5-5">
+  <link rel="stylesheet" href="/assets/app.css?v=p6-1">
   <script src="/assets/vendor/rrule.min.js"></script>
   <script src="/assets/vendor/fullcalendar.global.min.js"></script>
   <script src="/assets/vendor/fullcalendar-rrule.global.min.js"></script>
@@ -47,6 +47,7 @@
       <div id="user-tools" class="user-tools" hidden>
         <button class="btn small" id="new-event-btn" type="button">＋ New event</button>
         <button class="btn small" id="new-cal-btn" type="button">＋ New calendar</button>
+        <button class="btn small" id="import-btn" type="button">↧ Import / Subscribe</button>
       </div>
     </aside>
 
@@ -191,11 +192,57 @@
         </form>
         <p class="form-error small" id="ce-share-error" hidden></p>
       </div>
+      <div id="ce-feed" class="share-section" hidden>
+        <h4>Subscription</h4>
+        <p class="muted small">This calendar mirrors an external feed and is read-only.</p>
+        <p class="feed-url small" id="ce-feed-url"></p>
+        <div class="feed-row">
+          <span class="muted small" id="ce-feed-synced"></span>
+          <span class="spacer"></span>
+          <button type="button" class="btn small" id="ce-feed-refresh">Refresh now</button>
+        </div>
+        <p class="form-error small" id="ce-feed-error" hidden></p>
+      </div>
+    </div>
+  </div>
+
+  <div id="import-modal" class="modal" hidden>
+    <div class="modal-card">
+      <button class="modal-close" id="im-close" aria-label="Close">×</button>
+      <h3>Import / Subscribe</h3>
+      <div class="seg" id="im-seg">
+        <button type="button" class="seg-btn on" data-mode="url">Subscribe to URL</button>
+        <button type="button" class="seg-btn" data-mode="file">Upload .ics file</button>
+      </div>
+
+      <form id="im-url-form" class="form">
+        <label>Feed URL<input type="url" id="im-url" placeholder="https://…  or  webcal://…" required></label>
+        <label>Name <span class="muted small">(optional — auto-detected)</span><input type="text" id="im-url-name"></label>
+        <label class="im-color-row">Color<input type="color" id="im-url-color" value="#5b9dd9"></label>
+        <p class="muted small">Creates a read-only calendar that stays in sync with the feed.</p>
+        <p class="form-error small" id="im-url-error" hidden></p>
+        <div class="modal-actions">
+          <span class="spacer"></span>
+          <button type="submit" class="btn primary small" id="im-url-submit">Subscribe</button>
+        </div>
+      </form>
+
+      <form id="im-file-form" class="form" hidden>
+        <label>.ics file<input type="file" id="im-file" accept=".ics,text/calendar" required></label>
+        <label>Import into<select id="im-file-target"></select></label>
+        <label id="im-file-name-wrap" hidden>New calendar name<input type="text" id="im-file-name"></label>
+        <p class="muted small">Events are added once (no ongoing syncing).</p>
+        <p class="form-error small" id="im-file-error" hidden></p>
+        <div class="modal-actions">
+          <span class="spacer"></span>
+          <button type="submit" class="btn primary small" id="im-file-submit">Import</button>
+        </div>
+      </form>
     </div>
   </div>
 
   <div class="app-version" id="app-version"></div>
 
-  <script src="/assets/app.js?v=p5-5"></script>
+  <script src="/assets/app.js?v=p6-1"></script>
 </body>
 </html>

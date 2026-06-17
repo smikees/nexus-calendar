@@ -8,6 +8,7 @@ $editable = editable_calendar_ids();
 $shared   = $u ? shared_calendar_roles() : [];
 
 $prefs = user_prefs();
+$staleAfter = 6 * 3600; // feeds older than 6h are considered stale (lazy re-sync)
 $out   = [];
 foreach (visible_calendars() as $c) {
     $cid   = (int) $c['id'];
@@ -16,6 +17,10 @@ foreach (visible_calendars() as $c) {
     $role  = $owned ? 'owner'
            : (($isAdmin && $c['visibility'] === 'public') ? 'admin'
            : ($shared[$cid] ?? ($c['visibility'] === 'public' ? 'public' : 'viewer')));
+    $feedUrl    = $c['feed_url'] ?? null;            // present only after phase-6 migration
+    $isFeed     = !empty($feedUrl);
+    $lastSynced = $c['feed_last_synced'] ?? null;
+    $feedStale  = $isFeed && (empty($lastSynced) || strtotime($lastSynced . ' UTC') < time() - $staleAfter);
     $out[] = [
         'id'         => $cid,
         'slug'       => $c['slug'],
@@ -28,8 +33,13 @@ foreach (visible_calendars() as $c) {
         'enabled'    => $p ? ((int) $p['enabled'] === 1) : true,
         'owned'      => $owned,
         'role'       => $role,
-        'canEdit'    => isset($editable[$cid]),
+        // Feed (subscribed) calendars are read-only mirrors: not event-editable.
+        'canEdit'    => isset($editable[$cid]) && !$isFeed,
         'canManage'  => $owned || ($isAdmin && $c['visibility'] === 'public'),
+        'isFeed'     => $isFeed,
+        'feedUrl'    => $isFeed ? $feedUrl : null,
+        'feedLastSynced' => $lastSynced,
+        'feedStale'  => $feedStale,
     ];
 }
 

@@ -278,6 +278,19 @@ body.resizing-sidebar { cursor: col-resize; user-select: none; }
   border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
 .cbx input:focus-visible + .cbx-box { box-shadow: 0 0 0 2px var(--border); }
 
+/* Import / subscribe modal. */
+.seg { display: flex; gap: 6px; margin: 14px 0 4px; }
+.seg-btn { flex: 1; padding: 7px 10px; border: 1px solid var(--border); background: var(--panel); color: var(--text);
+  border-radius: 8px; cursor: pointer; font-size: .85rem; }
+.seg-btn.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.seg-btn:hover:not(.on) { border-color: var(--accent); }
+.im-color-row { flex-direction: row !important; align-items: center; gap: 10px; color: var(--text) !important; }
+.im-color-row input[type="color"] { width: 60px; height: 34px; padding: 2px; }
+.form input[type="file"] { color: var(--text); font-size: .85rem; }
+.feed-url { word-break: break-all; color: var(--muted); margin-bottom: 8px; }
+.feed-row { display: flex; align-items: center; gap: 8px; }
+.feed-row .spacer { flex: 1; }
+
 /* Subtle app version marker, lower-left. */
 .app-version { position: fixed; left: 10px; bottom: 7px; font-size: .68rem; color: var(--muted);
   opacity: .45; z-index: 30; pointer-events: none; letter-spacing: .03em; }

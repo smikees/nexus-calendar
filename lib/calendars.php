@@ -140,6 +140,57 @@ function can_manage_calendar(int $calId): bool {
     return $row['visibility'] === 'public' && is_admin($u);
 }
 
+/** Whether the calendars table has the (phase-6) feed subscription columns. Cached; defensive. */
+function calendars_has_feed(): bool {
+    static $has = null;
+    if ($has === null) {
+        try { $has = (bool) db()->query("SHOW COLUMNS FROM calendars LIKE 'feed_url'")->fetch(); }
+        catch (PDOException $e) { $has = false; }
+    }
+    return $has;
+}
+
+/** True if the calendar mirrors an external feed (read-only). Safe before migration. */
+function is_feed_calendar(int $calId): bool {
+    if (!calendars_has_feed()) { return false; }
+    try {
+        $stmt = db()->prepare('SELECT feed_url FROM calendars WHERE id = ?');
+        $stmt->execute([$calId]);
+        return (bool) $stmt->fetchColumn();
+    } catch (PDOException $e) { return false; }
+}
+
+/**
+ * Create a private calendar owned by $uid; returns ['id'=>int,'slug'=>string].
+ * Pass $feedUrl to mark it as a feed subscription (ignored if not migrated).
+ */
+function create_private_calendar(int $uid, string $name, string $color, ?string $icon, ?string $feedUrl = null): array {
+    $pdo  = db();
+    $name = mb_substr($name, 0, 200);
+    $useFeed = ($feedUrl !== null && calendars_has_feed());
+    $slug = make_slug($name);
+    for ($try = 0; $try < 3; $try++) {
+        try {
+            if ($useFeed) {
+                $pdo->prepare(
+                    'INSERT INTO calendars (owner_user_id, slug, name, color, icon, visibility, default_priority, timezone, feed_url)
+                     VALUES (?,?,?,?,?,"private",100,"UTC",?)'
+                )->execute([$uid, $slug, $name, $color, $icon, $feedUrl]);
+            } else {
+                $pdo->prepare(
+                    'INSERT INTO calendars (owner_user_id, slug, name, color, icon, visibility, default_priority, timezone)
+                     VALUES (?,?,?,?,?,"private",100,"UTC")'
+                )->execute([$uid, $slug, $name, $color, $icon]);
+            }
+            return ['id' => (int) $pdo->lastInsertId(), 'slug' => $slug];
+        } catch (PDOException $e) {
+            if ($try === 2) { throw $e; }
+            $slug = make_slug($name);
+        }
+    }
+    throw new RuntimeException('could not create calendar');
+}
+
 /** URL-safe slug from a name, with a short random suffix for uniqueness. */
 function make_slug(string $name): string {
     $base = strtolower(trim($name));

@@ -134,6 +134,9 @@ if ($method === 'POST') {
     if (!can_edit_calendar($calId)) {
         json_out(['error' => 'forbidden', 'message' => 'You cannot add events to this calendar.'], 403);
     }
+    if (is_feed_calendar($calId)) {
+        json_out(['error' => 'forbidden', 'message' => 'This calendar mirrors a subscription and is read-only.'], 403);
+    }
     [$startUtc, $endUtc, $allDay] = resolve_times($body);
     $rrule = array_key_exists('rrule', $body) ? clean_rrule($body['rrule']) : null;
 
@@ -161,6 +164,9 @@ if ($method === 'PATCH' || $method === 'PUT') {
     $existing = load_event($id);
     if (!can_edit_calendar((int) $existing['calendar_id'])) {
         json_out(['error' => 'forbidden'], 403);
+    }
+    if (is_feed_calendar((int) $existing['calendar_id'])) {
+        json_out(['error' => 'forbidden', 'message' => 'This calendar mirrors a subscription and is read-only.'], 403);
     }
 
     $fields = [];
@@ -214,6 +220,9 @@ if ($method === 'DELETE') {
     $existing = load_event($id);
     if (!can_edit_calendar((int) $existing['calendar_id'])) {
         json_out(['error' => 'forbidden'], 403);
+    }
+    if (is_feed_calendar((int) $existing['calendar_id'])) {
+        json_out(['error' => 'forbidden', 'message' => 'This calendar mirrors a subscription and is read-only.'], 403);
     }
     $pdo->prepare('DELETE FROM events WHERE id = ?')->execute([$id]);
     json_out(['ok' => true]);
