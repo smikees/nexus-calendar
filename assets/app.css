@@ -169,9 +169,13 @@ body.resizing-sidebar { cursor: col-resize; user-select: none; }
 
 /* Faded icon motif on every event — the event's own icon, or its calendar's icon
    as a fallback (set via the --nc-icon CSS var in eventDidMount). */
-.fc-event.nc-icon { position: relative; overflow: hidden; }
+.fc-event.nc-icon { overflow: hidden; }
 .fc-event.nc-icon::after { content: var(--nc-icon); position: absolute; right: 3px; bottom: -1px;
   font-size: 16px; opacity: .5; pointer-events: none; line-height: 1; }
+/* Daygrid events are in normal flow, so they need a positioning context for the icon.
+   Timegrid events are already position:absolute (they fill their harness) — overriding
+   that to position:relative collapses them to content height, so we must NOT touch them. */
+.fc-daygrid-event.nc-icon { position: relative; }
 .fc-timegrid-event.nc-icon::after, .fc-daygrid-block-event.nc-icon::after { font-size: 28px; right: 5px; bottom: 1px; opacity: .55; }
 .evt-icon-prefix { opacity: 1; }
 
@@ -190,9 +194,9 @@ body.resizing-sidebar { cursor: col-resize; user-select: none; }
 .modal-close:hover { color: var(--text); }
 .modal-card { max-height: 88vh; overflow-y: auto; }
 
-/* Event detail: calendar-color accent stripe + big faded icon. */
-#event-modal .modal-card { border-left: 5px solid var(--modal-accent, var(--border)); }
-.modal-fade-icon { position: absolute; right: 16px; bottom: 14px; font-size: 60px; opacity: .16; pointer-events: none; line-height: 1; }
+/* Event detail: bold calendar-color frame + big faded icon (kept left of the buttons). */
+#event-modal .modal-card { border: 2px solid var(--modal-accent, var(--border)); border-left-width: 9px; }
+.modal-fade-icon { position: absolute; left: 18px; bottom: 14px; font-size: 60px; opacity: .16; pointer-events: none; line-height: 1; }
 .modal-fade-icon:empty { display: none; }
 
 .modal-actions { display: flex; align-items: center; gap: 8px; margin-top: 18px; }
