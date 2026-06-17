@@ -223,6 +223,81 @@ function ical_store_events(PDO $pdo, int $calId, array $events, bool $replace): 
     return $n;
 }
 
+/* ============================ EXPORT (generate .ics) ============================ */
+
+/** Escape a TEXT value per RFC 5545 (backslash, newline, comma, semicolon). */
+function ical_escape_text(string $v): string {
+    $v = str_replace('\\', '\\\\', $v);
+    $v = str_replace(["\r\n", "\n", "\r"], '\\n', $v);
+    $v = str_replace([',', ';'], ['\\,', '\\;'], $v);
+    return $v;
+}
+
+/** Fold a content line to <=75 octets, continuation lines prefixed with a space (UTF-8 safe). */
+function ical_fold(string $line): string {
+    if (strlen($line) <= 75) { return $line; }
+    $out = ''; $i = 0; $len = strlen($line); $first = true;
+    while ($i < $len) {
+        $take = min($first ? 75 : 74, $len - $i);
+        // don't split a UTF-8 multibyte sequence: back off while the next byte is a continuation byte
+        while ($take > 0 && ($i + $take) < $len && (ord($line[$i + $take]) & 0xC0) === 0x80) { $take--; }
+        if ($take <= 0) { $take = min($first ? 75 : 74, $len - $i); } // safety
+        $out .= ($first ? '' : "\r\n ") . substr($line, $i, $take);
+        $i += $take; $first = false;
+    }
+    return $out;
+}
+
+/**
+ * Build an iCalendar (VCALENDAR) document from event rows for one calendar.
+ * $cal needs ['name']; each $events row: id, uid, title, description, location,
+ * starts_at, ends_at (UTC SQL), all_day, rrule.
+ */
+function ical_export(array $cal, array $events): string {
+    $tz    = new DateTimeZone('UTC');
+    $stamp = gmdate('Ymd\THis\Z');
+    $lines = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Nexus Calendar//cal.stamih.com//EN',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+    ];
+    if (!empty($cal['name'])) { $lines[] = 'X-WR-CALNAME:' . ical_escape_text((string) $cal['name']); }
+    $lines[] = 'X-WR-TIMEZONE:UTC';
+
+    foreach ($events as $e) {
+        $allDay = (int) ($e['all_day'] ?? 0) === 1;
+        try {
+            $s  = new DateTime((string) $e['starts_at'], $tz);
+            $en = new DateTime((string) $e['ends_at'], $tz);
+        } catch (Exception $ex) { continue; }
+        $lines[] = 'BEGIN:VEVENT';
+        $lines[] = 'UID:' . (!empty($e['uid']) ? $e['uid'] : ('nc-' . ($e['id'] ?? bin2hex(random_bytes(4))) . '@cal.stamih.com'));
+        $lines[] = 'DTSTAMP:' . $stamp;
+        if ($allDay) {
+            $lines[] = 'DTSTART;VALUE=DATE:' . $s->format('Ymd');
+            $lines[] = 'DTEND;VALUE=DATE:' . $en->format('Ymd');   // storage end is already exclusive
+        } else {
+            $lines[] = 'DTSTART:' . $s->format('Ymd\THis\Z');
+            $lines[] = 'DTEND:' . $en->format('Ymd\THis\Z');
+        }
+        if (!empty($e['rrule']))       { $lines[] = 'RRULE:' . $e['rrule']; }
+        $lines[] = 'SUMMARY:' . ical_escape_text((string) ($e['title'] ?? ''));
+        if (!empty($e['location']))    { $lines[] = 'LOCATION:' . ical_escape_text((string) $e['location']); }
+        if (!empty($e['description'])) { $lines[] = 'DESCRIPTION:' . ical_escape_text((string) $e['description']); }
+        $lines[] = 'END:VEVENT';
+    }
+    $lines[] = 'END:VCALENDAR';
+
+    return implode("\r\n", array_map('ical_fold', $lines)) . "\r\n";
+}
+
+/** A random, unguessable feed token (40 hex chars). */
+function ical_gen_feed_token(): string {
+    return bin2hex(random_bytes(20));
+}
+
 /** True if a host resolves to a private/loopback/reserved address (SSRF guard). */
 function ical_host_is_private(string $host): bool {
     $host = trim($host, '[]');

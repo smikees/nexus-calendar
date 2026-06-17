@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '0.7.0';
+  var APP_VERSION = '0.7.1';
   var K = {
     enabled: 'nc_enabled_v1', view: 'nc_view_v1', order: 'nc_order_v1',
     colors: 'nc_colors_v1', mode: 'nc_mode_v1', theme: 'nc_theme_v1',
@@ -151,6 +151,7 @@
           '</label>' +
           '<span class="cal-name">' + (c.icon ? esc(c.icon) + ' ' : '') + esc(c.name) + '</span>' +
           '<button class="cal-color-edit" data-act="color" style="background:' + esc(colorFor(slug)) + '" title="Change color" aria-label="Change color"></button>' +
+          '<a class="cal-dl" href="/api/export.php?calendar_id=' + c.id + '" title="Download .ics" aria-label="Download .ics" draggable="false" download>⤓</a>' +
           (c.canManage ? '<button class="robtn manage" data-act="manage" title="Manage / share">⚙</button>' : '') +
           '<input type="color" class="color-input" hidden value="' + esc(colorFor(slug)) + '">';
         list.appendChild(row);
@@ -432,6 +433,15 @@
     } else {
       feed.hidden = true; ceFeedCalId = null;
     }
+    var exp = $('ce-export');
+    if (cal && cal.canManage) {
+      exp.hidden = false;
+      $('ce-download').href = '/api/export.php?calendar_id=' + cal.id;
+      setLinkState(cal.feedToken || null);
+      showErr('ce-link-error', '');
+    } else {
+      exp.hidden = true;
+    }
     $('cal-editor').hidden = false;
     $('ce-name').focus();
   }
@@ -524,6 +534,38 @@
       reloadCalendars().then(function () { if (fc) fc.refetchEvents(); });
     });
   }
+  /* ---------- export / subscription link ---------- */
+  function feedUrlFor(token) { return location.origin + '/api/export.php?token=' + token; }
+  function setLinkState(token) {
+    if (token) {
+      $('ce-link-on').hidden = false; $('ce-link-off').hidden = true;
+      $('ce-link-url').value = feedUrlFor(token);
+    } else {
+      $('ce-link-on').hidden = true; $('ce-link-off').hidden = false;
+      $('ce-link-url').value = '';
+    }
+  }
+  function feedTokenAction(action) {
+    if (!ceId) return;
+    showErr('ce-link-error', '');
+    api('POST', '/api/feed_token.php', { calendar_id: ceId, action: action }).then(function (res) {
+      if (!res.ok) { showErr('ce-link-error', (res.data && res.data.message) || 'Could not update the link.'); return; }
+      var token = (res.data && res.data.token) || null;
+      setLinkState(token);
+      // keep local state in sync so reopening the editor reflects it
+      Object.keys(calendarsById).forEach(function (s) { if (calendarsById[s].id === ceId) calendarsById[s].feedToken = token; });
+    });
+  }
+  function copyLink() {
+    var inp = $('ce-link-url'); if (!inp.value) return;
+    inp.focus(); inp.select();
+    var btn = $('ce-link-copy');
+    var flash = function () { var t = btn.textContent; btn.textContent = 'Copied!'; setTimeout(function () { btn.textContent = t; }, 1200); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(inp.value).then(flash, function () { try { document.execCommand('copy'); flash(); } catch (e) {} });
+    } else { try { document.execCommand('copy'); flash(); } catch (e) {} }
+  }
+
   // Lazily re-sync subscribed calendars whose feed has gone stale (no host cron needed).
   function syncStaleFeeds() {
     var due = Array.from(enabledSet())
@@ -964,6 +1006,12 @@
     $('im-file-form').addEventListener('submit', submitFileImport);
     $('im-file-target').addEventListener('change', toggleImportFileName);
     $('ce-feed-refresh').addEventListener('click', refreshFeed);
+    $('ce-link-create').addEventListener('click', function () { feedTokenAction('enable'); });
+    $('ce-link-regen').addEventListener('click', function () { feedTokenAction('regenerate'); });
+    $('ce-link-disable').addEventListener('click', function () {
+      if (confirm('Disable the subscription link? Anyone using it will lose access.')) feedTokenAction('disable');
+    });
+    $('ce-link-copy').addEventListener('click', copyLink);
 
     var brand = $('brand-today');
     function goToday() { if (fc) { fc.changeView('timeGridDay'); fc.today(); } }

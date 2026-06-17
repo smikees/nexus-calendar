@@ -17,6 +17,7 @@ foreach (visible_calendars() as $c) {
     $role  = $owned ? 'owner'
            : (($isAdmin && $c['visibility'] === 'public') ? 'admin'
            : ($shared[$cid] ?? ($c['visibility'] === 'public' ? 'public' : 'viewer')));
+    $canManage  = $owned || ($isAdmin && $c['visibility'] === 'public');
     $feedUrl    = $c['feed_url'] ?? null;            // present only after phase-6 migration
     $isFeed     = !empty($feedUrl);
     $lastSynced = $c['feed_last_synced'] ?? null;
@@ -35,7 +36,9 @@ foreach (visible_calendars() as $c) {
         'role'       => $role,
         // Feed (subscribed) calendars are read-only mirrors: not event-editable.
         'canEdit'    => isset($editable[$cid]) && !$isFeed,
-        'canManage'  => $owned || ($isAdmin && $c['visibility'] === 'public'),
+        'canManage'  => $canManage,
+        // Public subscription token is the manager's own secret — only expose it to them.
+        'feedToken'  => $canManage ? ($c['feed_token'] ?? null) : null,
         'isFeed'     => $isFeed,
         'feedUrl'    => $isFeed ? $feedUrl : null,
         'feedLastSynced' => $lastSynced,

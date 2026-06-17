@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>Nexus Calendar</title>
-  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=p6-1">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=p6-2">
   <script>
     (function () {
       var allowed = ['slate', 'sand', 'forest', 'plum'];
@@ -15,7 +15,7 @@
       r.dataset.theme = (allowed.indexOf(t) >= 0) ? t : 'slate';
     })();
   </script>
-  <link rel="stylesheet" href="/assets/app.css?v=p6-1">
+  <link rel="stylesheet" href="/assets/app.css?v=p6-2">
   <script src="/assets/vendor/rrule.min.js"></script>
   <script src="/assets/vendor/fullcalendar.global.min.js"></script>
   <script src="/assets/vendor/fullcalendar-rrule.global.min.js"></script>
@@ -203,6 +203,25 @@
         </div>
         <p class="form-error small" id="ce-feed-error" hidden></p>
       </div>
+      <div id="ce-export" class="share-section" hidden>
+        <h4>Export &amp; share</h4>
+        <a class="btn small" id="ce-download" href="#" download>⤓ Download .ics</a>
+        <div id="ce-link-off" class="link-block">
+          <p class="muted small">Create a private link others can subscribe to — it auto-updates in their calendar app.</p>
+          <button type="button" class="btn small" id="ce-link-create">Create subscription link</button>
+        </div>
+        <div id="ce-link-on" class="link-block" hidden>
+          <label class="small">Subscription URL<input type="text" id="ce-link-url" readonly></label>
+          <div class="feed-row">
+            <button type="button" class="btn small" id="ce-link-copy">Copy</button>
+            <button type="button" class="btn small" id="ce-link-regen">Regenerate</button>
+            <span class="spacer"></span>
+            <button type="button" class="btn small danger" id="ce-link-disable">Disable</button>
+          </div>
+          <p class="muted small">Anyone with this link can view this calendar. Works with Google, Apple &amp; Outlook.</p>
+        </div>
+        <p class="form-error small" id="ce-link-error" hidden></p>
+      </div>
     </div>
   </div>
 
@@ -243,6 +262,6 @@
 
   <div class="app-version" id="app-version"></div>
 
-  <script src="/assets/app.js?v=p6-1"></script>
+  <script src="/assets/app.js?v=p6-2"></script>
 </body>
 </html>

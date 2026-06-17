@@ -128,6 +128,11 @@ body.resizing-sidebar { cursor: col-resize; user-select: none; }
   flex-shrink: 0; padding: 0; opacity: 0; transition: opacity .12s; }
 .cal-row:hover .cal-color-edit, .cal-color-edit:focus-visible { opacity: .95; }
 .cal-color-edit:hover { box-shadow: 0 0 0 2px var(--border); }
+/* Per-row download (.ics), revealed on hover like the color swatch. */
+.cal-dl { color: var(--muted); text-decoration: none; font-size: .95rem; line-height: 1; flex-shrink: 0;
+  opacity: 0; transition: opacity .12s; padding: 0 1px; }
+.cal-row:hover .cal-dl, .cal-dl:focus-visible { opacity: .9; }
+.cal-dl:hover { color: var(--accent); }
 .cal-row .manage { font-size: .8rem; }
 .user-tools { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
 .admin-tools { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
@@ -290,6 +295,10 @@ body.resizing-sidebar { cursor: col-resize; user-select: none; }
 .feed-url { word-break: break-all; color: var(--muted); margin-bottom: 8px; }
 .feed-row { display: flex; align-items: center; gap: 8px; }
 .feed-row .spacer { flex: 1; }
+.link-block { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+#ce-download { display: inline-block; margin-bottom: 4px; }
+#ce-link-url { width: 100%; background: var(--card-bg); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 9px; font-size: .8rem; }
 
 /* Subtle app version marker, lower-left. */
 .app-version { position: fixed; left: 10px; bottom: 7px; font-size: .68rem; color: var(--muted);
