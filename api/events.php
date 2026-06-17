@@ -62,6 +62,7 @@ foreach ($stmt->fetchAll() as $e) {
             'calendarName' => $e['cal_name'],
             'location'     => $e['location'],
             'description'  => $e['description'],
+            'icon'         => $e['icon'] ?? null,
             'recurring'    => $recurring,
             'canEdit'      => $canEdit,
             'startUtc'     => $startUtc,   // series base start (for editing recurring)

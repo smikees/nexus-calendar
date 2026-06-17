@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '0.5.0';
+  var APP_VERSION = '0.6.0';
   var K = {
     enabled: 'nc_enabled_v1', view: 'nc_view_v1', order: 'nc_order_v1',
     colors: 'nc_colors_v1', mode: 'nc_mode_v1', theme: 'nc_theme_v1',
@@ -62,6 +62,7 @@
   var calendarsById = {};
   var fc = null;
   var eeId = null;          // event id being edited (null = creating)
+  var eeSaving = false;     // in-flight save guard (prevents duplicate events)
   var ceId = null;          // calendar id being edited (null = creating)
   var ceShareCalId = null;  // calendar id whose shares are shown
 
@@ -150,8 +151,8 @@
             '<input type="checkbox" data-act="toggle"' + (enabled.has(slug) ? ' checked' : '') + '>' +
             '<span class="cbx-box"></span>' +
           '</label>' +
-          '<button class="dot" data-act="color" style="background:' + esc(colorFor(slug)) + '" title="Change color"></button>' +
           '<span class="cal-name">' + (c.icon ? esc(c.icon) + ' ' : '') + esc(c.name) + '</span>' +
+          '<button class="cal-color-edit" data-act="color" style="background:' + esc(colorFor(slug)) + '" title="Change color" aria-label="Change color"></button>' +
           (c.canManage ? '<button class="robtn manage" data-act="manage" title="Manage / share">⚙</button>' : '') +
           '<input type="color" class="color-input" hidden value="' + esc(colorFor(slug)) + '">';
         list.appendChild(row);
@@ -191,7 +192,8 @@
       if (fc) fc.refetchEvents();
     } else if (t.classList.contains('color-input')) {
       var colors = readJSON(K.colors, {}); colors[slug] = t.value; writeJSON(K.colors, colors);
-      row.querySelector('.dot').style.background = t.value;
+      var sw = row.querySelector('.cal-color-edit'); if (sw) sw.style.background = t.value;
+      var cbx = row.querySelector('.cbx'); if (cbx) cbx.style.setProperty('--cal-color', t.value);
       if (fc) fc.refetchEvents();
     }
   }
@@ -255,6 +257,7 @@
       endExclusive: endEx,
       location: p.location,
       description: p.description,
+      icon: p.icon || '',
       rrule: p.rruleBody || ''
     };
   }
@@ -294,6 +297,8 @@
     $('ee-end-date').value = toDateInput(endIncl);
     $('ee-location').value = norm.location || '';
     $('ee-desc').value = norm.description || '';
+    setIcon('ee', norm.icon || '');
+    $('ee-emoji-pop').hidden = true;
     $('ee-delete').hidden = !eeId;
     toggleAllDayFields(allday);
     parseRRULE(norm.rrule || '');
@@ -313,7 +318,7 @@
     var body = {
       title: title, calendar_id: calId, all_day: allday,
       location: $('ee-location').value.trim(), description: $('ee-desc').value.trim(),
-      rrule: buildRRULE()
+      icon: $('ee-icon').value, rrule: buildRRULE()
     };
     if (allday) {
       var sd = $('ee-start-date').value;
@@ -328,10 +333,16 @@
       body.start = new Date(sv).toISOString();
       body.end = ev2 ? new Date(ev2).toISOString() : '';
     }
+    if (eeSaving) return;          // guard against accidental double-submit
+    eeSaving = true;
+    var saveBtn = $('ee-form').querySelector('button[type="submit"]');
+    if (saveBtn) saveBtn.disabled = true;
     var req = eeId
       ? api('PATCH', '/api/event.php', Object.assign({ id: eeId }, body))
       : api('POST', '/api/event.php', body);
     req.then(function (res) {
+      eeSaving = false;
+      if (saveBtn) saveBtn.disabled = false;
       if (!res.ok) { showErr('ee-error', (res.data && res.data.message) || 'Could not save event.'); return; }
       closeEditor();
       if (fc) fc.refetchEvents();
@@ -451,6 +462,17 @@
       });
   }
 
+  /* ---------- sticky toolbar offset ----------
+     The toolbar is position:sticky at the top of the scroll area; the grid's own
+     sticky date header (stickyHeaderDates) must sit just below it. We publish the
+     toolbar's measured height as a CSS var the header offsets against. */
+  function syncStickyToolbar() {
+    var tb = document.querySelector('.fc .fc-header-toolbar');
+    var wrap = document.querySelector('.calendar-wrap');
+    if (!tb || !wrap) return;
+    wrap.style.setProperty('--nc-toolbar-h', tb.offsetHeight + 'px');
+  }
+
   /* ---------- calendar ---------- */
   function initCalendar() {
     var el = $('calendar');
@@ -476,7 +498,11 @@
       },
       buttonText: { today: 'Today', month: 'Month', week: 'Week', day: 'Day', list: 'Agenda' },
       eventOrder: 'order,start',
-      datesSet: function (info) { localStorage.setItem(K.view, info.view.type); },
+      datesSet: function (info) {
+        localStorage.setItem(K.view, info.view.type);
+        requestAnimationFrame(syncStickyToolbar);
+      },
+      viewDidMount: function () { requestAnimationFrame(syncStickyToolbar); },
       eventClick: function (info) { info.jsEvent.preventDefault(); openModal(info); },
       select: function (sel) {
         var cals = editableCalendars();
@@ -487,12 +513,26 @@
       eventDrop: patchTimes,
       eventResize: patchTimes,
       eventDidMount: function (info) {
-        if (info.event.extendedProps.recurring) {
-          var t = info.el.querySelector('.fc-event-title') || info.el.querySelector('.fc-list-event-title');
-          if (t && t.textContent.indexOf('↻') !== 0) {
-            var span = document.createElement('span');
-            span.textContent = '↻ '; span.className = 'recur-mark';
-            t.insertBefore(span, t.firstChild);
+        var p = info.event.extendedProps || {};
+        var isList = info.view.type.indexOf('list') === 0;
+        var titleEl = info.el.querySelector('.fc-event-title') || info.el.querySelector('.fc-list-event-title');
+        if (p.recurring && titleEl && titleEl.textContent.indexOf('↻') !== 0) {
+          var span = document.createElement('span');
+          span.textContent = '↻ '; span.className = 'recur-mark';
+          titleEl.insertBefore(span, titleEl.firstChild);
+        }
+        // Faded icon motif: the event's own icon overrides its calendar's icon.
+        var cal = calendarsById[p.calendar];
+        var icon = p.icon || (cal && cal.icon) || '';
+        if (icon) {
+          if (isList) {
+            if (titleEl) {
+              var s = document.createElement('span'); s.className = 'evt-icon-prefix';
+              s.textContent = icon + ' '; titleEl.insertBefore(s, titleEl.firstChild);
+            }
+          } else {
+            info.el.classList.add('nc-icon');
+            info.el.style.setProperty('--nc-icon', '"' + icon + '"');
           }
         }
       },
@@ -518,59 +558,103 @@
     });
     window.__nccal = fc;
     fc.render();
-    requestAnimationFrame(function () { try { fc.updateSize(); } catch (e) {} });
+    requestAnimationFrame(function () { try { fc.updateSize(); } catch (e) {} syncStickyToolbar(); });
+    window.addEventListener('resize', function () { requestAnimationFrame(syncStickyToolbar); });
   }
 
-  /* ---------- emoji picker ---------- */
-  function setCalIcon(e) {
-    $('ce-icon').value = e || '';
-    $('ce-icon-btn').textContent = e || '📅';
+  /* ---------- emoji picker (shared by calendar 'ce' and event 'ee' editors) ---------- */
+  function setIcon(prefix, e) {
+    $(prefix + '-icon').value = e || '';
+    var btn = $(prefix + '-icon-btn');
+    if (e) { btn.textContent = e; btn.classList.remove('empty'); }
+    else if (prefix === 'ce') { btn.textContent = '📅'; btn.classList.remove('empty'); }
+    else { btn.textContent = '＋'; btn.classList.add('empty'); }
   }
-  function renderEmojiGrid(filter) {
-    var grid = $('ce-emoji-grid');
+  function setCalIcon(e) { setIcon('ce', e); } // back-compat for calendar editor
+  function renderEmojiGrid(prefix, filter) {
+    var grid = $(prefix + '-emoji-grid');
     var q = (filter || '').trim().toLowerCase();
     var items = EMOJIS.filter(function (it) { return !q || it.k.indexOf(q) >= 0 || it.e === q; });
     grid.innerHTML = '';
-    if (!items.length) { grid.innerHTML = '<div class="none">No emojis match.</div>'; return; }
+    if (prefix === 'ee') { // events may clear their icon
+      var none = document.createElement('button');
+      none.type = 'button'; none.className = 'emoji-none'; none.textContent = '∅'; none.title = 'No icon';
+      none.addEventListener('click', function () { setIcon('ee', ''); $('ee-emoji-pop').hidden = true; });
+      grid.appendChild(none);
+    }
+    if (!items.length && prefix !== 'ee') { grid.innerHTML = '<div class="none">No emojis match.</div>'; return; }
     items.forEach(function (it) {
       var b = document.createElement('button');
       b.type = 'button'; b.textContent = it.e; b.title = it.k;
-      b.addEventListener('click', function () { setCalIcon(it.e); $('ce-emoji-pop').hidden = true; });
+      b.addEventListener('click', function () { setIcon(prefix, it.e); $(prefix + '-emoji-pop').hidden = true; });
       grid.appendChild(b);
     });
   }
-  function toggleEmojiPicker() {
-    var pop = $('ce-emoji-pop');
+  function toggleEmojiPicker(prefix) {
+    var pop = $(prefix + '-emoji-pop');
     var willShow = pop.hidden;
     pop.hidden = !willShow;
     if (willShow) {
-      $('ce-emoji-search').value = '';
-      renderEmojiGrid('');
-      setTimeout(function () { $('ce-emoji-search').focus(); }, 0);
+      $(prefix + '-emoji-search').value = '';
+      renderEmojiGrid(prefix, '');
+      setTimeout(function () { $(prefix + '-emoji-search').focus(); }, 0);
     }
   }
 
   /* ---------- recurrence (RRULE build / parse) ---------- */
   var WEEKDAYS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+  var WD_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  var ORDINALS = ['first', 'second', 'third', 'fourth', 'fifth'];
   function freqUnit(freq) {
     return { DAILY: 'days', WEEKLY: 'weeks', MONTHLY: 'months', YEARLY: 'years' }[freq] || '';
+  }
+  function daysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
+  // The start instant currently in the editor (timed or all-day).
+  function editorStartDate() {
+    var d = $('ee-allday').checked ? new Date(($('ee-start-date').value || '') + 'T00:00:00')
+                                   : new Date($('ee-start').value);
+    return isNaN(d.getTime()) ? new Date() : d;
+  }
+  // Build the "monthly on…" options from the start date (Google-style): on day N,
+  // on the Nth weekday, and (when applicable) on the last weekday. Values encode BYDAY.
+  function buildMonthlyOptions() {
+    var sel = $('ee-monthly-mode');
+    var cur = sel.value;
+    var d = editorStartDate();
+    var dom = d.getDate();
+    var wdIdx = (d.getDay() + 6) % 7;     // JS Sun=0 -> our MO=0
+    var wd = WEEKDAYS[wdIdx];
+    var n = Math.ceil(dom / 7);           // 1..5
+    var isLast = (dom + 7) > daysInMonth(d.getFullYear(), d.getMonth());
+    var opts = [{ v: '', t: 'day ' + dom }];
+    if (n <= ORDINALS.length) opts.push({ v: n + wd, t: 'the ' + ORDINALS[n - 1] + ' ' + WD_NAMES[wdIdx] });
+    if (isLast) opts.push({ v: '-1' + wd, t: 'the last ' + WD_NAMES[wdIdx] });
+    sel.innerHTML = '';
+    opts.forEach(function (o) {
+      var e = document.createElement('option'); e.value = o.v; e.textContent = o.t; sel.appendChild(e);
+    });
+    if (opts.some(function (o) { return o.v === cur; })) sel.value = cur;
+  }
+  function syncEndType() {
+    var t = $('ee-end-type').value;
+    $('ee-count').hidden = (t !== 'count');
+    $('ee-count-unit').hidden = (t !== 'count');
+    $('ee-until').hidden = (t !== 'until');
   }
   function syncRecurUI() {
     var freq = $('ee-freq').value;
     $('ee-recur-opts').hidden = !freq;
     $('ee-interval-unit').textContent = freqUnit(freq);
     $('ee-byday').hidden = (freq !== 'WEEKLY');
+    $('ee-monthly').hidden = (freq !== 'MONTHLY');
+    if (freq === 'MONTHLY') buildMonthlyOptions();
     if (freq === 'WEEKLY') {
       // default to the start day's weekday if nothing selected
       var anyOn = $('ee-byday').querySelector('button.on');
       if (!anyOn) {
-        var d = $('ee-allday').checked ? new Date(($('ee-start-date').value || '') + 'T00:00:00')
-                                       : new Date($('ee-start').value);
-        if (!isNaN(d.getTime())) {
-          var idx = (d.getDay() + 6) % 7; // JS Sun=0 -> our MO=0
-          var btn = $('ee-byday').querySelector('button[data-d="' + WEEKDAYS[idx] + '"]');
-          if (btn) btn.classList.add('on');
-        }
+        var idx = (editorStartDate().getDay() + 6) % 7;
+        var btn = $('ee-byday').querySelector('button[data-d="' + WEEKDAYS[idx] + '"]');
+        if (btn) btn.classList.add('on');
       }
     }
   }
@@ -583,8 +667,11 @@
     if (freq === 'WEEKLY') {
       var days = Array.prototype.map.call($('ee-byday').querySelectorAll('button.on'), function (b) { return b.dataset.d; });
       if (days.length) parts.push('BYDAY=' + days.join(','));
+    } else if (freq === 'MONTHLY') {
+      var mv = $('ee-monthly-mode').value;          // e.g. '3WE' or '-1FR'; '' => on start day-of-month
+      if (mv) parts.push('BYDAY=' + mv);
     }
-    var end = (document.querySelector('input[name="ee-end"]:checked') || {}).value;
+    var end = $('ee-end-type').value;
     if (end === 'count') {
       var n = parseInt($('ee-count').value, 10); if (n > 0) parts.push('COUNT=' + n);
     } else if (end === 'until') {
@@ -599,28 +686,28 @@
     $('ee-interval').value = '1';
     $('ee-count').value = '10';
     $('ee-until').value = '';
+    $('ee-end-type').value = 'never';
     Array.prototype.forEach.call($('ee-byday').querySelectorAll('button'), function (b) { b.classList.remove('on'); });
-    var never = document.querySelector('input[name="ee-end"][value="never"]'); if (never) never.checked = true;
+    var map = {};
     if (body) {
-      var map = {};
       body.split(';').forEach(function (kv) { var p = kv.split('='); if (p[0]) map[p[0].toUpperCase()] = p[1] || ''; });
       if (map.FREQ) $('ee-freq').value = map.FREQ;
       if (map.INTERVAL) $('ee-interval').value = map.INTERVAL;
-      if (map.BYDAY) {
+      if (map.FREQ === 'WEEKLY' && map.BYDAY) {
         map.BYDAY.split(',').forEach(function (d) {
           var btn = $('ee-byday').querySelector('button[data-d="' + d + '"]'); if (btn) btn.classList.add('on');
         });
       }
-      if (map.COUNT) {
-        var c = document.querySelector('input[name="ee-end"][value="count"]'); if (c) c.checked = true;
-        $('ee-count').value = map.COUNT;
-      } else if (map.UNTIL) {
-        var u = document.querySelector('input[name="ee-end"][value="until"]'); if (u) u.checked = true;
+      if (map.COUNT) { $('ee-end-type').value = 'count'; $('ee-count').value = map.COUNT; }
+      else if (map.UNTIL) {
+        $('ee-end-type').value = 'until';
         var m = map.UNTIL.match(/^(\d{4})(\d{2})(\d{2})/);
         if (m) $('ee-until').value = m[1] + '-' + m[2] + '-' + m[3];
       }
     }
-    syncRecurUI();
+    syncRecurUI();                                    // builds monthly options from start date
+    if (map.FREQ === 'MONTHLY' && map.BYDAY) $('ee-monthly-mode').value = map.BYDAY;
+    syncEndType();
   }
 
   /* ---------- resizable sidebar ---------- */
@@ -674,7 +761,7 @@
     $('ee-cancel').addEventListener('click', closeEditor);
     $('event-editor').addEventListener('click', function (e) { if (e.target.id === 'event-editor') closeEditor(); });
     $('ee-form').addEventListener('submit', saveEvent);
-    $('ee-allday').addEventListener('change', function () { toggleAllDayFields(this.checked); });
+    $('ee-allday').addEventListener('change', function () { toggleAllDayFields(this.checked); if (!$('ee-recur-opts').hidden) syncRecurUI(); });
     $('ee-cal').addEventListener('change', paintCalSelect);
     $('ee-delete').addEventListener('click', function () { deleteEvent(eeId); });
 
@@ -683,13 +770,20 @@
     $('cal-editor').addEventListener('click', function (e) { if (e.target.id === 'cal-editor') closeCalEditor(); });
     $('ce-form').addEventListener('submit', saveCal);
     $('ce-delete').addEventListener('click', function () { deleteCal(ceId); });
-    $('ce-icon-btn').addEventListener('click', toggleEmojiPicker);
-    $('ce-emoji-search').addEventListener('input', function () { renderEmojiGrid(this.value); });
+    $('ce-icon-btn').addEventListener('click', function () { toggleEmojiPicker('ce'); });
+    $('ce-emoji-search').addEventListener('input', function () { renderEmojiGrid('ce', this.value); });
+    $('ee-icon-btn').addEventListener('click', function () { toggleEmojiPicker('ee'); });
+    $('ee-emoji-search').addEventListener('input', function () { renderEmojiGrid('ee', this.value); });
 
     $('ee-freq').addEventListener('change', syncRecurUI);
+    $('ee-end-type').addEventListener('change', syncEndType);
     $('ee-byday').addEventListener('click', function (e) {
       var b = e.target.closest('button[data-d]'); if (b) b.classList.toggle('on');
     });
+    // Keep monthly "first Tuesday"-style options / weekly default in step with the start date.
+    function reSyncRecur() { if (!$('ee-recur-opts').hidden) syncRecurUI(); }
+    $('ee-start').addEventListener('change', reSyncRecur);
+    $('ee-start-date').addEventListener('change', reSyncRecur);
     $('ce-share-list').addEventListener('click', function (e) {
       var b = e.target.closest('[data-share-id]'); if (!b) return;
       api('DELETE', '/api/shares.php', { id: parseInt(b.dataset.shareId, 10) }).then(function (res) {
@@ -723,7 +817,7 @@
     });
 
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') { closeModal(); closeEditor(); closeCalEditor(); $('ce-emoji-pop').hidden = true; }
+      if (e.key === 'Escape') { closeModal(); closeEditor(); closeCalEditor(); $('ce-emoji-pop').hidden = true; $('ee-emoji-pop').hidden = true; }
     });
   }
 

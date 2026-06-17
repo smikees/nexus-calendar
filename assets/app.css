@@ -120,16 +120,33 @@ body.resizing-sidebar { cursor: col-resize; user-select: none; }
 .robtn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: .58rem; padding: 0 2px; }
 .robtn:hover { color: var(--accent); }
 .cal-row input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px; }
-.dot { width: 13px; height: 13px; border-radius: 50%; border: none; cursor: pointer; flex-shrink: 0; padding: 0; }
-.dot:hover { box-shadow: 0 0 0 2px var(--border); }
-.cal-name { font-size: .9rem; }
-.cal-row .manage { margin-left: auto; font-size: .8rem; }
+.cal-name { font-size: .9rem; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Color edit: a small swatch revealed on row hover (replaces the always-on dot). */
+.cal-color-edit { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--border); cursor: pointer;
+  flex-shrink: 0; padding: 0; opacity: 0; transition: opacity .12s; }
+.cal-row:hover .cal-color-edit, .cal-color-edit:focus-visible { opacity: .95; }
+.cal-color-edit:hover { box-shadow: 0 0 0 2px var(--border); }
+.cal-row .manage { font-size: .8rem; }
 .user-tools { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
 .admin-tools { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
 
 .calendar-wrap { flex: 1; min-width: 0; padding: 18px; overflow: auto; }
 .fc { color: var(--text); }
 .fc .fc-toolbar-title { font-size: 1.15rem; }
+
+/* Sticky toolbar (#6): nav + view buttons stay visible while scrolling. */
+.calendar-wrap .fc .fc-header-toolbar {
+  position: sticky; top: 0; z-index: 7;
+  margin-bottom: 0; padding: 2px 0 10px;
+  background: var(--card-bg);
+}
+/* Date headers stick just below the toolbar and stay opaque so content can't bleed
+   through them (#8). --nc-toolbar-h is published by JS from the toolbar's height. */
+.calendar-wrap .fc .fc-scrollgrid-section-sticky > * { top: var(--nc-toolbar-h, 0px); background: var(--card-bg); }
+.calendar-wrap .fc .fc-col-header-cell { background: var(--card-bg); }
+.calendar-wrap .fc .fc-list-day { position: relative; z-index: 3; }
+.calendar-wrap .fc .fc-list-day > th { top: var(--nc-toolbar-h, 0px); }
+.calendar-wrap .fc .fc-list-day-cushion { background: var(--card-bg); }
 .fc .fc-button { text-transform: none; font-weight: 500; box-shadow: none !important; background: var(--panel); border-color: var(--border); color: var(--text); }
 .fc .fc-button:hover { border-color: var(--accent); }
 .fc .fc-button-primary:not(:disabled).fc-button-active,
@@ -148,10 +165,16 @@ body.resizing-sidebar { cursor: col-resize; user-select: none; }
 .fc-highlight { background: var(--fc-today-bg-color); }
 .fc-event.fc-event-dragging, .fc-event.fc-event-resizing { opacity: .75; }
 
-/* World Cup event personality: gold inset accent + faded ball motif */
+/* Faded icon motif on every event — the event's own icon, or its calendar's icon
+   as a fallback (set via the --nc-icon CSS var in eventDidMount). */
+.fc-event.nc-icon { position: relative; overflow: hidden; }
+.fc-event.nc-icon::after { content: var(--nc-icon); position: absolute; right: 2px; bottom: -2px;
+  font-size: 14px; opacity: .22; pointer-events: none; line-height: 1; }
+.fc-timegrid-event.nc-icon::after, .fc-daygrid-block-event.nc-icon::after { font-size: 22px; right: 4px; bottom: 0; opacity: .18; }
+.evt-icon-prefix { opacity: .9; }
+
+/* World Cup gold accent stripe (the ⚽ now comes from the calendar's own icon). */
 .fc-event.evt-world-cup { position: relative; overflow: hidden; box-shadow: inset 2px 0 0 rgba(251,191,36,0.9); }
-.fc-event.evt-world-cup::after { content: '\26BD'; position: absolute; right: 2px; bottom: -2px; font-size: 14px; opacity: .22; pointer-events: none; line-height: 1; }
-.fc-timegrid-event.evt-world-cup::after, .fc-daygrid-block-event.evt-world-cup::after { font-size: 22px; right: 4px; bottom: 0; opacity: .18; }
 
 .muted { color: var(--muted); }
 .small { font-size: .82rem; }
@@ -211,23 +234,26 @@ body.resizing-sidebar { cursor: col-resize; user-select: none; }
 .emoji-grid button:hover { background: var(--panel); }
 .emoji-grid .none { grid-column: 1 / -1; color: var(--muted); font-size: .8rem; text-align: center; padding: 10px; }
 
-/* Recurrence (repeat) controls. */
-.inline-field { flex-direction: row !important; align-items: center; gap: 8px; color: var(--text) !important; }
-.inline-field input[type="number"] { width: 72px; }
-.inline-field .unit { color: var(--muted); font-size: .85rem; }
-#ee-recur-opts { display: flex; flex-direction: column; gap: 11px; padding: 11px; margin-top: 2px;
+/* Recurrence (repeat) controls — compact, mostly single-row layout. */
+#ee-recur-opts { display: flex; flex-direction: column; gap: 9px; padding: 10px 11px; margin-top: 2px;
   border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+.recur-line { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: var(--text); font-size: .88rem; }
+.recur-label { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; min-width: 42px; }
+.recur-line .unit { color: var(--muted); font-size: .85rem; }
+.recur-line input[type="number"] { width: 64px; }
+.recur-line select { width: auto; min-width: 0; }
+.recur-line input[type="date"] { width: auto; flex: 0 1 auto; }
 .weekday-row { display: flex; gap: 4px; }
 .weekday-row button { flex: 1; height: 30px; border: 1px solid var(--border); background: var(--card-bg);
   color: var(--text); border-radius: 7px; cursor: pointer; font-size: .82rem; }
 .weekday-row button:hover { border-color: var(--accent); }
 .weekday-row button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
-.ends-block { display: flex; flex-direction: column; gap: 6px; }
-.ends-title { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-.ends-block .radio { display: flex; align-items: center; gap: 6px; font-size: .88rem; color: var(--text); }
-.ends-block .radio input[type="number"] { width: 64px; }
-.ends-block .radio input[type="date"] { flex: 0 1 auto; }
-.ends-block input[type="radio"] { accent-color: var(--accent); }
+
+/* Event editor: Calendar + Icon share a row; icon button stays compact. */
+#event-editor .field-pair > label.cal-field { flex: 1 1 auto; }
+#event-editor .field-pair > label.icon-field { flex: 0 0 auto; }
+.icon-pick-btn.empty { color: var(--muted); font-size: 1.45rem; font-weight: 300; }
+.emoji-grid .emoji-none { color: var(--muted); font-size: 1.05rem; }
 
 /* Calendar checkbox tinted to the calendar's own color. */
 .cbx { position: relative; display: inline-flex; align-items: center; cursor: pointer; flex-shrink: 0; }

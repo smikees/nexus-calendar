@@ -40,6 +40,22 @@ function load_event(int $id): array {
     return $row;
 }
 
+/** Whether the events table has the (phase-5) icon column. Cached; defensive if absent. */
+function events_has_icon(): bool {
+    static $has = null;
+    if ($has === null) {
+        try { $has = (bool) db()->query("SHOW COLUMNS FROM events LIKE 'icon'")->fetch(); }
+        catch (PDOException $e) { $has = false; }
+    }
+    return $has;
+}
+
+/** Normalise a per-event icon (short emoji string). Empty => null. */
+function clean_icon($v): ?string {
+    $v = trim((string) $v);
+    return $v === '' ? null : mb_substr($v, 0, 16);
+}
+
 /** Shape an event row the same way api/events.php does (non-recurring path). */
 function shape_event(array $e): array {
     $allDay   = (int) $e['all_day'] === 1;
@@ -58,6 +74,7 @@ function shape_event(array $e): array {
             'calendarName' => $e['cal_name'],
             'location'     => $e['location'],
             'description'  => $e['description'],
+            'icon'         => $e['icon'] ?? null,
             'recurring'    => false,
             'canEdit'      => $editable,
         ],
@@ -120,16 +137,19 @@ if ($method === 'POST') {
     [$startUtc, $endUtc, $allDay] = resolve_times($body);
     $rrule = array_key_exists('rrule', $body) ? clean_rrule($body['rrule']) : null;
 
-    $stmt = $pdo->prepare(
-        'INSERT INTO events (calendar_id, uid, title, description, location, starts_at, ends_at, all_day, rrule, timezone)
-         VALUES (:cal, :uid, :title, :description, :location, :starts, :ends, :allday, :rrule, "UTC")'
-    );
-    $stmt->execute([
+    $cols = ['calendar_id', 'uid', 'title', 'description', 'location', 'starts_at', 'ends_at', 'all_day', 'rrule', 'timezone'];
+    $args = [
         ':cal' => $calId, ':uid' => make_event_uid(), ':title' => mb_substr($title, 0, 500),
         ':description' => ($body['description'] ?? null) ?: null,
         ':location'    => ($body['location'] ?? null) ?: null,
         ':starts' => $startUtc, ':ends' => $endUtc, ':allday' => $allDay, ':rrule' => $rrule,
-    ]);
+    ];
+    $vals = [':cal', ':uid', ':title', ':description', ':location', ':starts', ':ends', ':allday', ':rrule', '"UTC"'];
+    if (events_has_icon()) {
+        $cols[] = 'icon'; $vals[] = ':icon'; $args[':icon'] = clean_icon($body['icon'] ?? '');
+    }
+    $sql = 'INSERT INTO events (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $vals) . ')';
+    $pdo->prepare($sql)->execute($args);
     json_out(['event' => shape_event(load_event((int) $pdo->lastInsertId()))], 201);
 }
 
@@ -155,6 +175,7 @@ if ($method === 'PATCH' || $method === 'PUT') {
     if (array_key_exists('description', $body)) { $fields[] = 'description = ?'; $args[] = ($body['description'] ?: null); }
     if (array_key_exists('location', $body))    { $fields[] = 'location = ?';    $args[] = ($body['location'] ?: null); }
     if (array_key_exists('rrule', $body))       { $fields[] = 'rrule = ?';       $args[] = clean_rrule($body['rrule']); }
+    if (array_key_exists('icon', $body) && events_has_icon()) { $fields[] = 'icon = ?'; $args[] = clean_icon($body['icon']); }
 
     // Move to another calendar (must be able to edit the destination too).
     if (array_key_exists('calendar_id', $body)) {

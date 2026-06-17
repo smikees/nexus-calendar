@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>Nexus Calendar</title>
-  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=p4-4">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=p5-1">
   <script>
     (function () {
       var allowed = ['slate', 'sand', 'forest', 'plum'];
@@ -15,7 +15,7 @@
       r.dataset.theme = (allowed.indexOf(t) >= 0) ? t : 'slate';
     })();
   </script>
-  <link rel="stylesheet" href="/assets/app.css?v=p4-4">
+  <link rel="stylesheet" href="/assets/app.css?v=p5-1">
   <script src="/assets/vendor/rrule.min.js"></script>
   <script src="/assets/vendor/fullcalendar.global.min.js"></script>
   <script src="/assets/vendor/fullcalendar-rrule.global.min.js"></script>
@@ -82,7 +82,17 @@
       <h3 id="ee-heading">New event</h3>
       <form id="ee-form" class="form">
         <label>Title<input type="text" id="ee-title-input" required></label>
-        <label>Calendar<select id="ee-cal"></select></label>
+        <div class="field-pair">
+          <label class="cal-field">Calendar<select id="ee-cal"></select></label>
+          <label class="icon-field">Icon
+            <button type="button" class="icon-pick-btn empty" id="ee-icon-btn" title="Choose an icon" aria-label="Choose an icon">＋</button>
+            <input type="hidden" id="ee-icon">
+          </label>
+        </div>
+        <div class="emoji-pop" id="ee-emoji-pop" hidden>
+          <input type="text" class="emoji-search" id="ee-emoji-search" placeholder="Search emojis…" autocomplete="off">
+          <div class="emoji-grid" id="ee-emoji-grid"></div>
+        </div>
         <label class="checkbox"><input type="checkbox" id="ee-allday"> All day</label>
         <div id="ee-timed" class="field-pair">
           <label>Starts<input type="datetime-local" id="ee-start"></label>
@@ -102,10 +112,11 @@
           </select>
         </label>
         <div id="ee-recur-opts" hidden>
-          <label class="inline-field">Every
+          <div class="recur-line">
+            <span class="recur-label">Every</span>
             <input type="number" id="ee-interval" min="1" max="999" value="1">
             <span id="ee-interval-unit" class="unit">days</span>
-          </label>
+          </div>
           <div id="ee-byday" class="weekday-row" hidden>
             <button type="button" data-d="MO">M</button>
             <button type="button" data-d="TU">T</button>
@@ -115,13 +126,20 @@
             <button type="button" data-d="SA">S</button>
             <button type="button" data-d="SU">S</button>
           </div>
-          <div class="ends-block">
-            <span class="ends-title">Ends</span>
-            <label class="radio"><input type="radio" name="ee-end" value="never" checked> Never</label>
-            <label class="radio"><input type="radio" name="ee-end" value="count"> After
-              <input type="number" id="ee-count" min="1" max="999" value="10"> occurrences</label>
-            <label class="radio"><input type="radio" name="ee-end" value="until"> On date
-              <input type="date" id="ee-until"></label>
+          <div id="ee-monthly" class="recur-line" hidden>
+            <span class="recur-label">On</span>
+            <select id="ee-monthly-mode"></select>
+          </div>
+          <div class="recur-line">
+            <span class="recur-label">Ends</span>
+            <select id="ee-end-type">
+              <option value="never">Never</option>
+              <option value="count">After</option>
+              <option value="until">On date</option>
+            </select>
+            <input type="number" id="ee-count" min="1" max="999" value="10" hidden>
+            <span id="ee-count-unit" class="unit" hidden>times</span>
+            <input type="date" id="ee-until" hidden>
           </div>
         </div>
         <label>Location<input type="text" id="ee-location"></label>
@@ -180,6 +198,6 @@
 
   <div class="app-version" id="app-version"></div>
 
-  <script src="/assets/app.js?v=p4-4"></script>
+  <script src="/assets/app.js?v=p5-1"></script>
 </body>
 </html>
