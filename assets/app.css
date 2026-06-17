@@ -179,8 +179,10 @@ body.resizing-sidebar { cursor: col-resize; user-select: none; }
 .fc-timegrid-event.nc-icon::after, .fc-daygrid-block-event.nc-icon::after { font-size: 28px; right: 5px; bottom: 1px; opacity: .55; }
 .evt-icon-prefix { opacity: 1; }
 
-/* World Cup gold accent stripe (the ⚽ now comes from the calendar's own icon). */
-.fc-event.evt-world-cup { position: relative; overflow: hidden; box-shadow: inset 2px 0 0 rgba(251,191,36,0.9); }
+/* World Cup gold accent stripe (the ⚽ now comes from the calendar's own icon).
+   NOTE: must NOT set position:relative here — it would override FullCalendar's
+   absolute fill on timegrid events and collapse them to content height. */
+.fc-event.evt-world-cup { box-shadow: inset 2px 0 0 rgba(251,191,36,0.9); }
 
 .muted { color: var(--muted); }
 .small { font-size: .82rem; }

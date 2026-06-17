@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '0.6.2';
+  var APP_VERSION = '0.6.3';
   var K = {
     enabled: 'nc_enabled_v1', view: 'nc_view_v1', order: 'nc_order_v1',
     colors: 'nc_colors_v1', mode: 'nc_mode_v1', theme: 'nc_theme_v1',
