@@ -560,6 +560,8 @@
     fc.render();
     requestAnimationFrame(function () { try { fc.updateSize(); } catch (e) {} syncStickyToolbar(); });
     window.addEventListener('resize', function () { requestAnimationFrame(syncStickyToolbar); });
+    // rAF is paused in background tabs; recompute the offset the moment the tab is shown.
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) syncStickyToolbar(); });
   }
 
   /* ---------- emoji picker (shared by calendar 'ce' and event 'ee' editors) ---------- */
