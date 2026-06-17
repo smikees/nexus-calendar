@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>Nexus Calendar</title>
-  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=p5-2">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=p5-3">
   <script>
     (function () {
       var allowed = ['slate', 'sand', 'forest', 'plum'];
@@ -15,7 +15,7 @@
       r.dataset.theme = (allowed.indexOf(t) >= 0) ? t : 'slate';
     })();
   </script>
-  <link rel="stylesheet" href="/assets/app.css?v=p5-2">
+  <link rel="stylesheet" href="/assets/app.css?v=p5-3">
   <script src="/assets/vendor/rrule.min.js"></script>
   <script src="/assets/vendor/fullcalendar.global.min.js"></script>
   <script src="/assets/vendor/fullcalendar-rrule.global.min.js"></script>
@@ -48,9 +48,6 @@
         <button class="btn small" id="new-event-btn" type="button">＋ New event</button>
         <button class="btn small" id="new-cal-btn" type="button">＋ New calendar</button>
       </div>
-      <div id="admin-tools" class="admin-tools" hidden>
-        <a class="btn small" href="/admin/seed.php">Load sample data</a>
-      </div>
     </aside>
 
     <div class="sidebar-resizer" id="sidebar-resizer" title="Drag to resize"></div>
@@ -68,6 +65,7 @@
       <p id="modal-when"></p>
       <p id="modal-where" class="muted"></p>
       <p id="modal-desc" class="muted small"></p>
+      <span class="modal-fade-icon" id="modal-icon" aria-hidden="true"></span>
       <div class="modal-actions" id="modal-actions" hidden>
         <span class="spacer"></span>
         <button class="btn small danger" id="modal-delete" type="button">Delete</button>
@@ -198,6 +196,6 @@
 
   <div class="app-version" id="app-version"></div>
 
-  <script src="/assets/app.js?v=p5-2"></script>
+  <script src="/assets/app.js?v=p5-3"></script>
 </body>
 </html>

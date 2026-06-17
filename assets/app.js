@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '0.6.0';
+  var APP_VERSION = '0.6.1';
   var K = {
     enabled: 'nc_enabled_v1', view: 'nc_view_v1', order: 'nc_order_v1',
     colors: 'nc_colors_v1', mode: 'nc_mode_v1', theme: 'nc_theme_v1',
@@ -141,12 +141,9 @@
       slugs.forEach(function (slug) {
         var c = calendarsById[slug];
         var row = document.createElement('div');
-        row.className = 'cal-row'; row.dataset.slug = slug;
+        row.className = 'cal-row'; row.dataset.slug = slug; row.draggable = true;
         row.innerHTML =
-          '<span class="reorder">' +
-            '<button class="robtn" data-act="up" title="Move up">▲</button>' +
-            '<button class="robtn" data-act="down" title="Move down">▼</button>' +
-          '</span>' +
+          '<span class="drag-handle" title="Drag to reorder" aria-label="Drag to reorder">⠿</span>' +
           '<label class="cbx" style="--cal-color:' + esc(colorFor(slug)) + '" title="Show / hide">' +
             '<input type="checkbox" data-act="toggle"' + (enabled.has(slug) ? ' checked' : '') + '>' +
             '<span class="cbx-box"></span>' +
@@ -159,7 +156,6 @@
       });
     }
     $('user-tools').hidden = !user;
-    $('admin-tools').hidden = !(user && user.is_admin);
   }
 
   function onSidebarClick(ev) {
@@ -172,15 +168,43 @@
       row.querySelector('.color-input').click();
     } else if (act === 'manage') {
       openCalEditor(calendarsById[slug]);
-    } else if (act === 'up' || act === 'down') {
-      var order = orderedSlugs(); var i = order.indexOf(slug);
-      var j = act === 'up' ? i - 1 : i + 1;
-      if (j < 0 || j >= order.length) return;
-      var tmp = order[i]; order[i] = order[j]; order[j] = tmp;
-      writeJSON(K.order, order);
-      renderSidebar(window._ncUser);
-      if (fc) fc.refetchEvents();
     }
+  }
+
+  /* ---------- drag & drop reordering ---------- */
+  function calRowAfter(list, y) {
+    var rows = Array.prototype.slice.call(list.querySelectorAll('.cal-row:not(.dragging)'));
+    var closest = { offset: -Infinity, el: null };
+    rows.forEach(function (r) {
+      var box = r.getBoundingClientRect();
+      var off = y - box.top - box.height / 2;
+      if (off < 0 && off > closest.offset) closest = { offset: off, el: r };
+    });
+    return closest.el;
+  }
+  function onSidebarDragStart(ev) {
+    var row = ev.target.closest ? ev.target.closest('.cal-row') : null;
+    if (!row) return;
+    row.classList.add('dragging');
+    ev.dataTransfer.effectAllowed = 'move';
+    try { ev.dataTransfer.setData('text/plain', row.dataset.slug); } catch (e) {}
+  }
+  function onSidebarDragOver(ev) {
+    var list = $('calendar-list');
+    var dragging = list.querySelector('.cal-row.dragging');
+    if (!dragging) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'move';
+    var after = calRowAfter(list, ev.clientY);
+    if (after == null) list.appendChild(dragging);
+    else if (after !== dragging) list.insertBefore(dragging, after);
+  }
+  function onSidebarDragEnd() {
+    var list = $('calendar-list');
+    var dragging = list.querySelector('.cal-row.dragging');
+    if (dragging) dragging.classList.remove('dragging');
+    var order = Array.prototype.map.call(list.querySelectorAll('.cal-row'), function (r) { return r.dataset.slug; });
+    if (order.length) { writeJSON(K.order, order); if (fc) fc.refetchEvents(); }
   }
   function onSidebarChange(ev) {
     var t = ev.target; var row = t.closest('.cal-row'); if (!row) return;
@@ -230,6 +254,13 @@
     $('modal-when').textContent = when;
     $('modal-where').textContent = p.location || '';
     $('modal-desc').textContent = p.description || '';
+    // Calendar-color accent + faded icon for quick visual identification.
+    var color = colorFor(p.calendar) || ev.backgroundColor || 'var(--border)';
+    var cal = calendarsById[p.calendar];
+    var icon = p.icon || (cal && cal.icon) || '';
+    var card = $('event-modal').querySelector('.modal-card');
+    if (card) card.style.setProperty('--modal-accent', color);
+    $('modal-icon').textContent = icon;
     $('modal-actions').hidden = !p.canEdit;
     $('event-modal').hidden = false;
   }
@@ -484,6 +515,7 @@
       dayMaxEvents: 3,
       allDaySlot: true,
       allDayText: 'all-day',
+      slotEventOverlap: false,   // overlapping timed events tile side-by-side (Outlook-style)
       stickyHeaderDates: true,
       editable: true,
       selectable: true,
@@ -812,7 +844,7 @@
     $('new-cal-btn').addEventListener('click', function () { openCalEditor(null); });
 
     var brand = $('brand-today');
-    function goToday() { if (fc) fc.today(); }
+    function goToday() { if (fc) { fc.changeView('timeGridDay'); fc.today(); } }
     brand.addEventListener('click', goToday);
     brand.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goToday(); }
@@ -832,6 +864,10 @@
     var listEl = $('calendar-list');
     listEl.addEventListener('click', onSidebarClick);
     listEl.addEventListener('change', onSidebarChange);
+    listEl.addEventListener('dragstart', onSidebarDragStart);
+    listEl.addEventListener('dragover', onSidebarDragOver);
+    listEl.addEventListener('drop', function (e) { e.preventDefault(); });
+    listEl.addEventListener('dragend', onSidebarDragEnd);
 
     reloadCalendars()
       .then(function () {
