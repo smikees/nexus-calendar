@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '0.7.1';
+  var APP_VERSION = '0.7.2';
   var K = {
     enabled: 'nc_enabled_v1', view: 'nc_view_v1', order: 'nc_order_v1',
     colors: 'nc_colors_v1', mode: 'nc_mode_v1', theme: 'nc_theme_v1',
@@ -117,9 +117,9 @@
     return out;
   }
   function orderIndex(slug) { var i = orderedSlugs().indexOf(slug); return i < 0 ? 999 : i; }
+  // Single source of truth: the calendar's own color (managed in the edit window).
   function colorFor(slug) {
-    var c = readJSON(K.colors, {});
-    return c[slug] || (calendarsById[slug] && calendarsById[slug].color) || '#888888';
+    return (calendarsById[slug] && calendarsById[slug].color) || '#888888';
   }
   function enabledSet() {
     var stored = readJSON(K.enabled, null);
@@ -150,10 +150,7 @@
             '<span class="cbx-box"></span>' +
           '</label>' +
           '<span class="cal-name">' + (c.icon ? esc(c.icon) + ' ' : '') + esc(c.name) + '</span>' +
-          '<button class="cal-color-edit" data-act="color" style="background:' + esc(colorFor(slug)) + '" title="Change color" aria-label="Change color"></button>' +
-          '<a class="cal-dl" href="/api/export.php?calendar_id=' + c.id + '" title="Download .ics" aria-label="Download .ics" draggable="false" download>⤓</a>' +
-          (c.canManage ? '<button class="robtn manage" data-act="manage" title="Manage / share">⚙</button>' : '') +
-          '<input type="color" class="color-input" hidden value="' + esc(colorFor(slug)) + '">';
+          (c.canManage ? '<button class="robtn manage" data-act="manage" title="Edit calendar" aria-label="Edit calendar">✎</button>' : '');
         list.appendChild(row);
       });
     }
@@ -166,9 +163,7 @@
     var row = ev.target.closest('.cal-row'); if (!row) return;
     var slug = row.dataset.slug;
     var act = btn.dataset.act;
-    if (act === 'color') {
-      row.querySelector('.color-input').click();
-    } else if (act === 'manage') {
+    if (act === 'manage') {
       openCalEditor(calendarsById[slug]);
     }
   }
@@ -215,11 +210,6 @@
       var set = enabledSet();
       if (t.checked) set.add(slug); else set.delete(slug);
       writeJSON(K.enabled, Array.from(set));
-      if (fc) fc.refetchEvents();
-    } else if (t.classList.contains('color-input')) {
-      var colors = readJSON(K.colors, {}); colors[slug] = t.value; writeJSON(K.colors, colors);
-      var sw = row.querySelector('.cal-color-edit'); if (sw) sw.style.background = t.value;
-      var cbx = row.querySelector('.cbx'); if (cbx) cbx.style.setProperty('--cal-color', t.value);
       if (fc) fc.refetchEvents();
     }
   }
@@ -731,12 +721,9 @@
         fetch(url, { credentials: 'same-origin' })
           .then(function (r) { return r.json(); })
           .then(function (d) {
-            var colors = readJSON(K.colors, {});
             (d.events || []).forEach(function (e) {
               e.extendedProps = e.extendedProps || {};
-              var slug = e.extendedProps.calendar;
-              e.extendedProps.order = orderIndex(slug);
-              if (slug && colors[slug]) e.color = colors[slug];
+              e.extendedProps.order = orderIndex(e.extendedProps.calendar);
             });
             success(d.events || []);
           })
