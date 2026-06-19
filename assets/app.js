@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '0.7.4';
+  var APP_VERSION = '0.7.5';
   var K = {
     enabled: 'nc_enabled_v1', view: 'nc_view_v1', order: 'nc_order_v1',
     colors: 'nc_colors_v1', mode: 'nc_mode_v1', theme: 'nc_theme_v1',
@@ -286,6 +286,48 @@
     }
     flushPara(); closeList();
     return html.join('');
+  }
+
+  /* ---------- Markdown formatting toolbar (textarea helpers) ---------- */
+  function mdWrap(ta, before, after, placeholder) {
+    var s = ta.selectionStart, e = ta.selectionEnd, val = ta.value;
+    var sel = val.slice(s, e) || placeholder || '';
+    ta.value = val.slice(0, s) + before + sel + after + val.slice(e);
+    ta.selectionStart = s + before.length;
+    ta.selectionEnd = s + before.length + sel.length;
+    ta.focus();
+  }
+  function mdLinePrefix(ta, prefix) {
+    var s = ta.selectionStart, e = ta.selectionEnd, val = ta.value;
+    var ls = val.lastIndexOf('\n', s - 1) + 1;
+    var le = val.indexOf('\n', e); if (le === -1) le = val.length;
+    var rep = val.slice(ls, le).split('\n').map(function (ln) {
+      return ln ? prefix + ln : ln;
+    }).join('\n');
+    ta.value = val.slice(0, ls) + rep + val.slice(le);
+    ta.selectionStart = ls;
+    ta.selectionEnd = ls + rep.length;
+    ta.focus();
+  }
+  function mdLink(ta) {
+    var s = ta.selectionStart, e = ta.selectionEnd, val = ta.value;
+    var sel = val.slice(s, e) || 'text';
+    ta.value = val.slice(0, s) + '[' + sel + '](url)' + val.slice(e);
+    var us = s + sel.length + 3; // after '[' + sel + ']('
+    ta.selectionStart = us;
+    ta.selectionEnd = us + 3; // selects 'url'
+    ta.focus();
+  }
+  function applyMd(ta, type) {
+    if (!ta) return;
+    switch (type) {
+      case 'bold': return mdWrap(ta, '**', '**', 'bold');
+      case 'italic': return mdWrap(ta, '*', '*', 'italic');
+      case 'code': return mdWrap(ta, '`', '`', 'code');
+      case 'heading': return mdLinePrefix(ta, '## ');
+      case 'ul': return mdLinePrefix(ta, '- ');
+      case 'link': return mdLink(ta);
+    }
   }
 
   function openModal(info) {
@@ -999,6 +1041,25 @@
     $('ee-allday').addEventListener('change', function () { toggleAllDayFields(this.checked); if (!$('ee-recur-opts').hidden) syncRecurUI(); });
     $('ee-cal').addEventListener('change', paintCalSelect);
     $('ee-delete').addEventListener('click', function () { deleteEvent(eeId); });
+
+    // Markdown formatting toolbar: keep the textarea selection on mousedown,
+    // then insert syntax on click (delegated so it works for any .md-toolbar).
+    document.addEventListener('mousedown', function (e) {
+      if (e.target.closest && e.target.closest('.md-btn')) e.preventDefault();
+    });
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest && e.target.closest('.md-btn');
+      if (!btn) return;
+      var bar = btn.closest('.md-toolbar');
+      applyMd($(bar.getAttribute('data-target')), btn.getAttribute('data-md'));
+    });
+    $('ee-desc').addEventListener('keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+        var k = e.key.toLowerCase();
+        if (k === 'b') { e.preventDefault(); applyMd(this, 'bold'); }
+        else if (k === 'i') { e.preventDefault(); applyMd(this, 'italic'); }
+      }
+    });
 
     $('ce-close').addEventListener('click', closeCalEditor);
     $('ce-cancel').addEventListener('click', closeCalEditor);

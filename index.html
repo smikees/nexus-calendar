@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>Nexus Calendar</title>
-  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=p6-5">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=p6-6">
   <script>
     (function () {
       var allowed = ['slate', 'sand', 'forest', 'plum'];
@@ -15,7 +15,7 @@
       r.dataset.theme = (allowed.indexOf(t) >= 0) ? t : 'slate';
     })();
   </script>
-  <link rel="stylesheet" href="/assets/app.css?v=p6-5">
+  <link rel="stylesheet" href="/assets/app.css?v=p6-6">
   <script src="/assets/vendor/rrule.min.js"></script>
   <script src="/assets/vendor/fullcalendar.global.min.js"></script>
   <script src="/assets/vendor/fullcalendar-rrule.global.min.js"></script>
@@ -142,7 +142,18 @@
           </div>
         </div>
         <label>Location<input type="text" id="ee-location"></label>
-        <label>Description<textarea id="ee-desc" rows="3"></textarea></label>
+        <div class="field">
+          <span>Description</span>
+          <div class="md-toolbar" data-target="ee-desc" role="toolbar" aria-label="Description formatting">
+            <button type="button" class="md-btn" data-md="bold" title="Bold (Ctrl+B)" aria-label="Bold"><strong>B</strong></button>
+            <button type="button" class="md-btn" data-md="italic" title="Italic (Ctrl+I)" aria-label="Italic"><em>I</em></button>
+            <button type="button" class="md-btn" data-md="code" title="Inline code" aria-label="Inline code">&lt;/&gt;</button>
+            <button type="button" class="md-btn" data-md="heading" title="Heading" aria-label="Heading">H</button>
+            <button type="button" class="md-btn" data-md="ul" title="Bulleted list" aria-label="Bulleted list">• List</button>
+            <button type="button" class="md-btn" data-md="link" title="Link" aria-label="Link">🔗 Link</button>
+          </div>
+          <textarea id="ee-desc" rows="3"></textarea>
+        </div>
         <p class="muted small field-hint">Markdown supported — **bold**, *italic*, `code`, # headings, - lists, [links](url)</p>
         <p class="form-error small" id="ee-error" hidden></p>
         <div class="modal-actions">
@@ -263,6 +274,6 @@
 
   <div class="app-version" id="app-version"></div>
 
-  <script src="/assets/app.js?v=p6-5"></script>
+  <script src="/assets/app.js?v=p6-6"></script>
 </body>
 </html>

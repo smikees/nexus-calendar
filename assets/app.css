@@ -219,9 +219,13 @@ body.resizing-sidebar { cursor: col-resize; user-select: none; }
 .btn.danger:hover { background: rgba(229,72,77,0.12); border-color: #e5484d; }
 
 .form { display: flex; flex-direction: column; gap: 11px; margin-top: 14px; }
-.form label { display: flex; flex-direction: column; gap: 4px; font-size: .8rem; color: var(--muted); }
+.form label, .form .field { display: flex; flex-direction: column; gap: 4px; font-size: .8rem; color: var(--muted); }
 .form label.checkbox { flex-direction: row; align-items: center; gap: 8px; color: var(--text); font-size: .9rem; }
 .form .field-hint { margin: -4px 0 2px; }
+.md-toolbar { display: flex; flex-wrap: wrap; gap: 4px; }
+.md-btn { font: inherit; font-size: .8rem; line-height: 1.2; padding: 4px 8px; min-width: 28px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; transition: border-color .15s, color .15s; }
+.md-btn:hover { border-color: var(--accent); color: var(--accent); }
+.md-btn em { font-style: italic; }
 .form input[type="text"], .form input[type="email"], .form input[type="url"],
 .form input[type="number"], .form input[type="search"], .form input[type="tel"],
 .form input[type="datetime-local"], .form input[type="date"], .form select, .form textarea {
