@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '0.7.2';
+  var APP_VERSION = '0.7.4';
   var K = {
     enabled: 'nc_enabled_v1', view: 'nc_view_v1', order: 'nc_order_v1',
     colors: 'nc_colors_v1', mode: 'nc_mode_v1', theme: 'nc_theme_v1',
@@ -229,6 +229,65 @@
   }
 
   /* ---------- event detail modal ---------- */
+  /* ---------- tiny, safe Markdown renderer ----------
+     Dependency-free (no build step on this host). HTML is fully escaped FIRST,
+     then only a fixed whitelist of tags we generate ourselves is introduced, so
+     there is no injection surface. Link hrefs are validated to http/https/mailto. */
+  function mdEscape(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function mdUnescape(s) {
+    return s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  }
+  function mdSafeUrl(url) {
+    var u = mdUnescape(String(url)).trim();
+    return /^(https?:\/\/|mailto:)/i.test(u) ? u : '';
+  }
+  function mdInline(text) {
+    // `text` is already HTML-escaped. Protect inline code spans from further formatting.
+    var codes = [];
+    var out = text.replace(/`([^`]+)`/g, function (_, c) {
+      codes.push(c); return '' + (codes.length - 1) + '';
+    });
+    out = out.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, function (_, t, u) {
+      var url = mdSafeUrl(u);
+      if (!url) return t;
+      return '<a href="' + mdEscape(url) + '" target="_blank" rel="noopener noreferrer">' + t + '</a>';
+    });
+    out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+             .replace(/__([^_]+)__/g, '<strong>$1</strong>')
+             .replace(/(^|[^*])\*([^*\s][^*]*?)\*/g, '$1<em>$2</em>')
+             .replace(/(^|[^_])_([^_\s][^_]*?)_/g, '$1<em>$2</em>');
+    return out.replace(/(\d+)/g, function (_, i) { return '<code>' + codes[i] + '</code>'; });
+  }
+  function renderMarkdown(src) {
+    var lines = mdEscape(src).replace(/\r\n?/g, '\n').split('\n');
+    var html = [], para = [], listType = null;
+    function closeList() { if (listType) { html.push('</' + listType + '>'); listType = null; } }
+    function flushPara() { if (para.length) { html.push('<p>' + mdInline(para.join('<br>')) + '</p>'); para = []; } }
+    for (var i = 0; i < lines.length; i++) {
+      var raw = lines[i].replace(/\s+$/, '');
+      if (!raw.trim()) { flushPara(); closeList(); continue; }
+      var h = raw.match(/^(#{1,6})\s+(.*)$/);
+      if (h) { flushPara(); closeList(); html.push('<h' + h[1].length + '>' + mdInline(h[2]) + '</h' + h[1].length + '>'); continue; }
+      var bq = raw.match(/^>\s?(.*)$/);
+      if (bq) { flushPara(); closeList(); html.push('<blockquote>' + mdInline(bq[1]) + '</blockquote>'); continue; }
+      var ul = raw.match(/^[-*+]\s+(.*)$/), ol = raw.match(/^\d+\.\s+(.*)$/);
+      if (ul || ol) {
+        flushPara();
+        var t = ul ? 'ul' : 'ol';
+        if (listType && listType !== t) closeList();
+        if (!listType) { listType = t; html.push('<' + t + '>'); }
+        html.push('<li>' + mdInline(ul ? ul[1] : ol[1]) + '</li>');
+        continue;
+      }
+      closeList();
+      para.push(raw);
+    }
+    flushPara(); closeList();
+    return html.join('');
+  }
+
   function openModal(info) {
     var ev = info.event;
     var p = ev.extendedProps || {};
@@ -245,7 +304,7 @@
     if (e && !ev.allDay) when += ' – ' + e.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
     $('modal-when').textContent = when;
     $('modal-where').textContent = p.location || '';
-    $('modal-desc').textContent = p.description || '';
+    $('modal-desc').innerHTML = renderMarkdown(p.description || '');
     // Calendar-color accent + faded icon for quick visual identification.
     var color = colorFor(p.calendar) || ev.backgroundColor || 'var(--border)';
     var cal = calendarsById[p.calendar];
