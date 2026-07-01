@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '0.8.0';
+  var APP_VERSION = '0.8.1';
   var K = {
     enabled: 'nc_enabled_v1', view: 'nc_view_v1', order: 'nc_order_v1',
     colors: 'nc_colors_v1', mode: 'nc_mode_v1', theme: 'nc_theme_v1',
@@ -357,6 +357,12 @@
     var card = $('event-modal').querySelector('.modal-card');
     if (card) card.style.setProperty('--modal-accent', color);
     $('modal-icon').textContent = icon;
+    // Recurring instances AND moved-occurrence overrides both belong to a series,
+    // so offer both scopes right here instead of a single generic Edit.
+    var seriesRelated = !!(p.recurring || p.partOfSeries);
+    $('modal-edit').hidden = seriesRelated;
+    $('modal-edit-occ').hidden = !seriesRelated;
+    $('modal-edit-series').hidden = !seriesRelated;
     $('modal-actions').hidden = !p.canEdit;
     $('event-modal').hidden = false;
   }
@@ -415,8 +421,8 @@
     $('ee-heading').textContent = eeId
       ? (isOcc ? 'Edit this occurrence' : (eeScope === 'series' ? 'Edit series' : 'Edit event'))
       : 'New event';
-    // A single occurrence can't change the repeat rule — hide those controls.
-    $('ee-repeat-row').hidden = isOcc;
+    // A single occurrence (or a detached one) can't change the repeat rule.
+    $('ee-repeat-row').hidden = isOcc || !!norm.hideRepeat;
     $('ee-title-input').value = norm.title || '';
     var sel = $('ee-cal'); sel.innerHTML = '';
     editableCalendars().forEach(function (c) {
@@ -516,19 +522,47 @@
       });
   }
 
-  // Delete from the detail modal, honouring the chosen scope for recurring events.
+  // Delete a whole series by id (server also purges its detached overrides).
+  function deleteSeries(seriesId) {
+    api('DELETE', '/api/event.php', { id: seriesId }).then(function (res) {
+      if (res.ok) { closeEditor(); closeModal(); if (fc) fc.refetchEvents(); }
+      else alert((res.data && res.data.message) || 'Could not delete series.');
+    });
+  }
+
+  // Delete from the detail modal, honouring the chosen scope for series events.
   function deleteRecurring(ev, scope) {
-    if (scope === 'occurrence') {
+    var p = ev.extendedProps || {};
+    if (scope === 'series') {
+      var seriesId = p.recurring ? parseInt(ev.id, 10) : (p.series && p.series.id);
+      if (!seriesId) return;
+      if (!confirm('Delete the entire series?')) return;
+      deleteSeries(seriesId);
+      return;
+    }
+    // scope === 'occurrence'
+    if (p.recurring) {
       var rid = ev.allDay ? String(ev.startStr).substr(0, 10) : ev.start.toISOString();
       if (!confirm('Delete this occurrence?')) return;
       deleteOccurrence(parseInt(ev.id, 10), rid);
     } else {
-      if (!confirm('Delete the entire series?')) return;
-      api('DELETE', '/api/event.php', { id: parseInt(ev.id, 10) }).then(function (res) {
-        if (res.ok) { closeEditor(); closeModal(); if (fc) fc.refetchEvents(); }
-        else alert((res.data && res.data.message) || 'Could not delete event.');
-      });
+      // A moved occurrence is its own row; deleting it removes just this event
+      // (the series keeps the EXDATE, so the slot stays empty).
+      deleteEvent(parseInt(ev.id, 10));
     }
+  }
+
+  // Build an editor "norm" for a series from the snapshot attached to an override.
+  function normFromSeries(s) {
+    var allDay = !!s.allDay;
+    var start = allDay ? new Date(String(s.startUtc).substr(0, 10) + 'T00:00:00') : new Date(s.startUtc);
+    var endEx = allDay ? new Date(String(s.endUtc).substr(0, 10) + 'T00:00:00') : new Date(s.endUtc);
+    return {
+      id: s.id, seriesId: s.id, scope: 'series', recurrenceId: null,
+      calendarId: s.calendarId, title: s.title, allDay: allDay,
+      start: start, endExclusive: endEx, location: s.location,
+      description: s.description, icon: s.icon || '', rrule: s.rruleBody || ''
+    };
   }
 
   // Outlook-style "this occurrence / entire series" chooser for recurring events.
@@ -864,7 +898,7 @@
         var p = info.event.extendedProps || {};
         var isList = info.view.type.indexOf('list') === 0;
         var titleEl = info.el.querySelector('.fc-event-title') || info.el.querySelector('.fc-list-event-title');
-        if (p.recurring && titleEl && titleEl.textContent.indexOf('↻') !== 0) {
+        if ((p.recurring || p.partOfSeries) && titleEl && titleEl.textContent.indexOf('↻') !== 0) {
           var span = document.createElement('span');
           span.textContent = '↻ '; span.className = 'recur-mark';
           titleEl.insertBefore(span, titleEl.firstChild);
@@ -1103,15 +1137,26 @@
     $('event-modal').addEventListener('click', function (e) { if (e.target.id === 'event-modal') closeModal(); });
     $('modal-edit').addEventListener('click', function () {
       var ev = window._ncCurrent; if (!ev) return;
-      if ((ev.extendedProps || {}).recurring) {
-        askScope('edit', function (scope) { closeModal(); openEventEditor(normFromEvent(ev, scope)); });
-      } else {
-        closeModal(); openEventEditor(normFromEvent(ev));
-      }
+      closeModal(); openEventEditor(normFromEvent(ev));
+    });
+    $('modal-edit-occ').addEventListener('click', function () {
+      var ev = window._ncCurrent; if (!ev) return;
+      var p = ev.extendedProps || {};
+      closeModal();
+      if (p.recurring) { openEventEditor(normFromEvent(ev, 'occurrence')); }
+      else { var n = normFromEvent(ev); n.hideRepeat = true; openEventEditor(n); } // moved occurrence: edit its own row
+    });
+    $('modal-edit-series').addEventListener('click', function () {
+      var ev = window._ncCurrent; if (!ev) return;
+      var p = ev.extendedProps || {};
+      closeModal();
+      if (p.recurring) { openEventEditor(normFromEvent(ev, 'series')); }
+      else if (p.series) { openEventEditor(normFromSeries(p.series)); }
     });
     $('modal-delete').addEventListener('click', function () {
       var ev = window._ncCurrent; if (!ev) return;
-      if ((ev.extendedProps || {}).recurring) {
+      var p = ev.extendedProps || {};
+      if (p.recurring || p.partOfSeries) {
         askScope('delete', function (scope) { deleteRecurring(ev, scope); });
       } else {
         deleteEvent(parseInt(ev.id, 10));

@@ -29,6 +29,27 @@ function exdate_line($exdates, bool $allDay): string {
         : "\nEXDATE:" . implode(',', $toks);
 }
 
+/**
+ * Editable snapshot of a series row, attached to a detached occurrence override
+ * so the client can offer "edit the entire series" from a moved instance.
+ */
+function series_ctx(array $p): array {
+    $allDay    = (int) $p['all_day'] === 1;
+    $recurring = isset($p['rrule']) && $p['rrule'] !== null && $p['rrule'] !== '';
+    return [
+        'id'          => (int) $p['id'],
+        'calendarId'  => (int) $p['calendar_id'],
+        'title'       => $p['title'],
+        'allDay'      => $allDay,
+        'startUtc'    => $allDay ? substr($p['starts_at'], 0, 10) : str_replace(' ', 'T', $p['starts_at']) . 'Z',
+        'endUtc'      => $allDay ? substr($p['ends_at'], 0, 10)   : str_replace(' ', 'T', $p['ends_at'])   . 'Z',
+        'location'    => $p['location'],
+        'description' => $p['description'],
+        'icon'        => $p['icon'] ?? null,
+        'rruleBody'   => $recurring ? $p['rrule'] : '',
+    ];
+}
+
 $from = (string) ($_GET['from'] ?? '');
 $to   = (string) ($_GET['to'] ?? '');
 $cals = array_filter(explode(',', (string) ($_GET['cals'] ?? '')));
@@ -69,8 +90,32 @@ $stmt->execute(array_merge($slugs, [$toUtc, $toUtc, $fromUtc]));
 
 $editable = editable_calendar_ids();
 
+$rows  = $stmt->fetchAll();
+$byUid = [];
+foreach ($rows as $r) { $byUid[$r['uid']] = $r; }
+// Detached occurrence overrides have uid "<seriesUid>::<token>". Make sure the
+// parent series row is available so we can attach its editable snapshot.
+$needParents = [];
+foreach ($rows as $r) {
+    $pos = strpos((string) $r['uid'], '::');
+    if ($pos !== false) {
+        $pu = substr((string) $r['uid'], 0, $pos);
+        if ($pu !== '' && !isset($byUid[$pu])) { $needParents[$pu] = true; }
+    }
+}
+if ($needParents) {
+    $pu  = array_keys($needParents);
+    $ph2 = implode(',', array_fill(0, count($pu), '?'));
+    $ps  = db()->prepare(
+        "SELECT e.*, c.slug AS cal_slug, c.color AS cal_color, c.name AS cal_name
+         FROM events e JOIN calendars c ON c.id = e.calendar_id WHERE e.uid IN ($ph2)"
+    );
+    $ps->execute($pu);
+    foreach ($ps->fetchAll() as $r) { $byUid[$r['uid']] = $r; }
+}
+
 $events = [];
-foreach ($stmt->fetchAll() as $e) {
+foreach ($rows as $e) {
     $allDay     = (int) $e['all_day'] === 1;
     $recurring  = isset($e['rrule']) && $e['rrule'] !== null && $e['rrule'] !== '';
     // Editable calendars allow drag/resize; recurring events drag a single
@@ -115,6 +160,16 @@ foreach ($stmt->fetchAll() as $e) {
     } else {
         $base['start'] = $startUtc;
         $base['end']   = $endUtc;
+    }
+    // A detached occurrence override still belongs to its series — expose that so
+    // the client can offer "edit this event / edit the entire series".
+    $pos = strpos((string) $e['uid'], '::');
+    if ($pos !== false) {
+        $parentUid = substr((string) $e['uid'], 0, $pos);
+        if ($parentUid !== '' && isset($byUid[$parentUid])) {
+            $base['extendedProps']['partOfSeries'] = true;
+            $base['extendedProps']['series'] = series_ctx($byUid[$parentUid]);
+        }
     }
     $events[] = $base;
 }
