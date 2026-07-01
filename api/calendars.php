@@ -2,6 +2,9 @@
 declare(strict_types=1);
 require_once __DIR__ . '/../lib/calendars.php';
 
+// Reflect calendar edits immediately; don't serve a stale cached list.
+header('Cache-Control: no-store, max-age=0');
+
 $u        = current_user();
 $isAdmin  = $u ? is_admin($u) : false;
 $editable = editable_calendar_ids();

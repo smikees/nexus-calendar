@@ -56,6 +56,38 @@ function clean_icon($v): ?string {
     return $v === '' ? null : mb_substr($v, 0, 16);
 }
 
+/** Whether the events table has the exdates column (base schema; defensive). Cached. */
+function events_has_exdates(): bool {
+    static $has = null;
+    if ($has === null) {
+        try { $has = (bool) db()->query("SHOW COLUMNS FROM events LIKE 'exdates'")->fetch(); }
+        catch (PDOException $e) { $has = false; }
+    }
+    return $has;
+}
+
+/** Compact RECURRENCE-ID token for an override uid, e.g. 20260715T190000Z or 20260715. */
+function recurrence_token(string $utcSql, bool $allDay): string {
+    $d = new DateTime($utcSql, new DateTimeZone('UTC'));
+    return $allDay ? $d->format('Ymd') : $d->format('Ymd\THis\Z');
+}
+
+/** Add an excluded occurrence (UTC 'Y-m-d H:i:s') to a series' exdates, de-duplicated. */
+function add_series_exdate(PDO $pdo, array $series, string $recUtcSql): void {
+    $cur  = (string) ($series['exdates'] ?? '');
+    $list = array_values(array_filter(array_map('trim', preg_split('/[,\r\n]+/', $cur))));
+    $want = (new DateTime($recUtcSql, new DateTimeZone('UTC')))->format('Y-m-d H:i:s');
+    foreach ($list as $x) {
+        try {
+            if ((new DateTime($x, new DateTimeZone('UTC')))->format('Y-m-d H:i:s') === $want) {
+                return; // already excluded
+            }
+        } catch (Exception $e) { /* skip junk */ }
+    }
+    $list[] = $want;
+    $pdo->prepare('UPDATE events SET exdates = ? WHERE id = ?')->execute([implode(',', $list), (int) $series['id']]);
+}
+
 /** Shape an event row the same way api/events.php does (non-recurring path). */
 function shape_event(array $e): array {
     $allDay   = (int) $e['all_day'] === 1;
@@ -169,6 +201,83 @@ if ($method === 'PATCH' || $method === 'PUT') {
         json_out(['error' => 'forbidden', 'message' => 'This calendar mirrors a subscription and is read-only.'], 403);
     }
 
+    // ---- Edit a SINGLE occurrence of a recurring series (Outlook-style) ----
+    // Suppress the original occurrence via EXDATE and materialise a detached
+    // override event (uid = "<seriesUid>::<recurrenceToken>"). Idempotent per occurrence.
+    $isRecurringSeries = isset($existing['rrule']) && trim((string) $existing['rrule']) !== '';
+    if (($body['scope'] ?? '') === 'occurrence' && $isRecurringSeries) {
+        if (!events_has_exdates()) {
+            json_out(['error' => 'migration_required', 'message' => 'The exdates column is missing; run db_setup.sql / migration.'], 503);
+        }
+        $allDaySeries = (int) $existing['all_day'] === 1;
+        $recRaw = (string) ($body['recurrence_id'] ?? '');
+        if ($recRaw === '') {
+            json_out(['error' => 'bad_request', 'message' => 'recurrence_id is required for an occurrence edit'], 400);
+        }
+        try { $recUtc = parse_to_utc($recRaw, $allDaySeries); }
+        catch (Exception $e) { json_out(['error' => 'bad_request', 'message' => 'invalid recurrence_id'], 400); }
+
+        // Destination calendar (allow moving a single occurrence too).
+        $calId = (int) $existing['calendar_id'];
+        if (array_key_exists('calendar_id', $body)) {
+            $dest = (int) $body['calendar_id'];
+            if ($dest !== $calId) {
+                if (!can_edit_calendar($dest)) {
+                    json_out(['error' => 'forbidden', 'message' => 'You cannot move events to that calendar.'], 403);
+                }
+                $calId = $dest;
+            }
+        }
+
+        // Resolve the override's start/end: from the request when timing changed,
+        // otherwise the original slot (recurrence start + the series' duration).
+        if (array_key_exists('start', $body)) {
+            [$startUtc, $endUtc, $allDay] = resolve_times($body);
+        } else {
+            $sSeries = new DateTime($existing['starts_at'], new DateTimeZone('UTC'));
+            $eSeries = new DateTime($existing['ends_at'], new DateTimeZone('UTC'));
+            $dur = max(0, $eSeries->getTimestamp() - $sSeries->getTimestamp());
+            $startUtc = $recUtc;
+            $eo = new DateTime($recUtc, new DateTimeZone('UTC'));
+            $eo->modify('+' . $dur . ' seconds');
+            $endUtc = $eo->format('Y-m-d H:i:s');
+            $allDay = $allDaySeries ? 1 : 0;
+        }
+
+        $title = array_key_exists('title', $body) ? trim((string) $body['title']) : (string) $existing['title'];
+        if ($title === '') { $title = (string) $existing['title']; }
+        $desc = array_key_exists('description', $body) ? (($body['description'] ?: null)) : $existing['description'];
+        $loc  = array_key_exists('location', $body)    ? (($body['location'] ?: null))    : $existing['location'];
+
+        add_series_exdate($pdo, $existing, $recUtc);
+
+        $ovUid = ((string) $existing['uid']) . '::' . recurrence_token($recUtc, $allDaySeries);
+        $cols = ['calendar_id', 'uid', 'title', 'description', 'location', 'starts_at', 'ends_at', 'all_day', 'rrule', 'exdates', 'timezone'];
+        $vals = [':cal', ':uid', ':title', ':desc', ':loc', ':starts', ':ends', ':allday', 'NULL', 'NULL', '"UTC"'];
+        $args = [
+            ':cal' => $calId, ':uid' => $ovUid, ':title' => mb_substr($title, 0, 500),
+            ':desc' => $desc, ':loc' => $loc, ':starts' => $startUtc, ':ends' => $endUtc, ':allday' => (int) $allDay,
+        ];
+        $updates = 'title=VALUES(title), description=VALUES(description), location=VALUES(location), '
+                 . 'starts_at=VALUES(starts_at), ends_at=VALUES(ends_at), all_day=VALUES(all_day), calendar_id=VALUES(calendar_id)';
+        if (events_has_icon()) {
+            $cols[] = 'icon'; $vals[] = ':icon';
+            $args[':icon'] = array_key_exists('icon', $body) ? clean_icon($body['icon']) : ($existing['icon'] ?? null);
+            $updates .= ', icon=VALUES(icon)';
+        }
+        $sql = 'INSERT INTO events (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $vals) . ') '
+             . 'ON DUPLICATE KEY UPDATE ' . $updates;
+        $pdo->prepare($sql)->execute($args);
+
+        $ov = db()->prepare(
+            'SELECT e.*, c.slug AS cal_slug, c.color AS cal_color, c.name AS cal_name
+             FROM events e JOIN calendars c ON c.id = e.calendar_id WHERE e.uid = ?'
+        );
+        $ov->execute([$ovUid]);
+        $ovRow = $ov->fetch();
+        json_out(['event' => $ovRow ? shape_event($ovRow) : null, 'occurrence' => true]);
+    }
+
     $fields = [];
     $args   = [];
     if (array_key_exists('title', $body)) {
@@ -224,7 +333,32 @@ if ($method === 'DELETE') {
     if (is_feed_calendar((int) $existing['calendar_id'])) {
         json_out(['error' => 'forbidden', 'message' => 'This calendar mirrors a subscription and is read-only.'], 403);
     }
+
+    $isRecurringSeries = isset($existing['rrule']) && trim((string) $existing['rrule']) !== '';
+
+    // Delete a single occurrence: EXDATE it and drop any detached override.
+    if (($body['scope'] ?? '') === 'occurrence' && $isRecurringSeries) {
+        if (!events_has_exdates()) {
+            json_out(['error' => 'migration_required', 'message' => 'The exdates column is missing; run db_setup.sql / migration.'], 503);
+        }
+        $allDaySeries = (int) $existing['all_day'] === 1;
+        $recRaw = (string) ($body['recurrence_id'] ?? '');
+        if ($recRaw === '') {
+            json_out(['error' => 'bad_request', 'message' => 'recurrence_id is required'], 400);
+        }
+        try { $recUtc = parse_to_utc($recRaw, $allDaySeries); }
+        catch (Exception $e) { json_out(['error' => 'bad_request', 'message' => 'invalid recurrence_id'], 400); }
+        add_series_exdate($pdo, $existing, $recUtc);
+        $ovUid = ((string) $existing['uid']) . '::' . recurrence_token($recUtc, $allDaySeries);
+        $pdo->prepare('DELETE FROM events WHERE uid = ?')->execute([$ovUid]);
+        json_out(['ok' => true, 'occurrence' => true]);
+    }
+
+    // Delete the whole event/series (and any detached occurrence overrides).
     $pdo->prepare('DELETE FROM events WHERE id = ?')->execute([$id]);
+    if ($isRecurringSeries) {
+        $pdo->prepare('DELETE FROM events WHERE uid LIKE ?')->execute([str_replace(['%', '_'], ['\\%', '\\_'], (string) $existing['uid']) . '::%']);
+    }
     json_out(['ok' => true]);
 }
 

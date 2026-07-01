@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>Nexus Calendar</title>
-  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=p6-6">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=p7-1">
   <script>
     (function () {
       var allowed = ['slate', 'sand', 'forest', 'plum'];
@@ -15,7 +15,7 @@
       r.dataset.theme = (allowed.indexOf(t) >= 0) ? t : 'slate';
     })();
   </script>
-  <link rel="stylesheet" href="/assets/app.css?v=p6-6">
+  <link rel="stylesheet" href="/assets/app.css?v=p7-1">
   <script src="/assets/vendor/rrule.min.js"></script>
   <script src="/assets/vendor/fullcalendar.global.min.js"></script>
   <script src="/assets/vendor/fullcalendar-rrule.global.min.js"></script>
@@ -101,7 +101,7 @@
           <label>Starts<input type="date" id="ee-start-date"></label>
           <label>Ends<input type="date" id="ee-end-date"></label>
         </div>
-        <label>Repeat
+        <label id="ee-repeat-row">Repeat
           <select id="ee-freq">
             <option value="">Does not repeat</option>
             <option value="DAILY">Daily</option>
@@ -237,6 +237,20 @@
     </div>
   </div>
 
+  <div id="recur-scope" class="modal" hidden>
+    <div class="modal-card">
+      <button class="modal-close" id="rs-close" aria-label="Close">×</button>
+      <h3 id="rs-title">Recurring event</h3>
+      <p class="muted small" id="rs-msg"></p>
+      <div class="modal-actions">
+        <span class="spacer"></span>
+        <button type="button" class="btn small" id="rs-cancel">Cancel</button>
+        <button type="button" class="btn small" id="rs-occurrence">This event</button>
+        <button type="button" class="btn primary small" id="rs-series">All events</button>
+      </div>
+    </div>
+  </div>
+
   <div id="import-modal" class="modal" hidden>
     <div class="modal-card">
       <button class="modal-close" id="im-close" aria-label="Close">×</button>
@@ -274,6 +288,6 @@
 
   <div class="app-version" id="app-version"></div>
 
-  <script src="/assets/app.js?v=p6-6"></script>
+  <script src="/assets/app.js?v=p7-1"></script>
 </body>
 </html>

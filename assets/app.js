@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '0.7.5';
+  var APP_VERSION = '0.8.0';
   var K = {
     enabled: 'nc_enabled_v1', view: 'nc_view_v1', order: 'nc_order_v1',
     colors: 'nc_colors_v1', mode: 'nc_mode_v1', theme: 'nc_theme_v1',
@@ -63,6 +63,9 @@
   var fc = null;
   var eeId = null;          // event id being edited (null = creating)
   var eeSaving = false;     // in-flight save guard (prevents duplicate events)
+  var eeScope = null;       // null | 'series' | 'occurrence' (recurring edits)
+  var eeSeriesId = null;    // series row id when editing a single occurrence
+  var eeRecurrenceId = null;// original occurrence start (ISO/date) for occurrence edits
   var ceId = null;          // calendar id being edited (null = creating)
   var ceShareCalId = null;  // calendar id whose shares are shown
   var ceFeedCalId = null;   // calendar id of the feed subscription being managed
@@ -360,20 +363,28 @@
   function closeModal() { $('event-modal').hidden = true; }
 
   /* ---------- event editor ---------- */
-  function normFromEvent(ev) {
+  function normFromEvent(ev, scope) {
     var p = ev.extendedProps || {};
     var span = ev.allDay ? 86400000 : 3600000;
-    var start, endEx;
-    if (p.recurring && p.startUtc) {
+    var occ = (scope === 'occurrence');
+    var start, endEx, recurrenceId = null;
+    if (p.recurring && !occ && p.startUtc) {
       // Edit the whole series from its base start, not the clicked occurrence.
       start = ev.allDay ? new Date(String(p.startUtc).substr(0, 10) + 'T00:00:00') : new Date(p.startUtc);
       endEx = ev.allDay ? new Date(String(p.endUtc).substr(0, 10) + 'T00:00:00') : new Date(p.endUtc);
     } else {
+      // This occurrence (or a plain one-off): use the clicked instance's times.
       start = ev.start;
       endEx = ev.end || new Date(ev.start.getTime() + span);
     }
+    if (p.recurring && occ) {
+      recurrenceId = ev.allDay ? String(ev.startStr).substr(0, 10) : ev.start.toISOString();
+    }
     return {
       id: parseInt(ev.id, 10),
+      seriesId: parseInt(ev.id, 10),
+      scope: p.recurring ? (occ ? 'occurrence' : 'series') : null,
+      recurrenceId: recurrenceId,
       calendarId: p.calendarId,
       title: ev.title,
       allDay: ev.allDay,
@@ -382,7 +393,7 @@
       location: p.location,
       description: p.description,
       icon: p.icon || '',
-      rrule: p.rruleBody || ''
+      rrule: (p.recurring && !occ) ? (p.rruleBody || '') : ''
     };
   }
   function toggleAllDayFields(on) {
@@ -397,7 +408,15 @@
   }
   function openEventEditor(norm) {
     eeId = norm.id || null;
-    $('ee-heading').textContent = eeId ? 'Edit event' : 'New event';
+    eeScope = norm.scope || null;
+    eeSeriesId = norm.seriesId || null;
+    eeRecurrenceId = norm.recurrenceId || null;
+    var isOcc = (eeScope === 'occurrence');
+    $('ee-heading').textContent = eeId
+      ? (isOcc ? 'Edit this occurrence' : (eeScope === 'series' ? 'Edit series' : 'Edit event'))
+      : 'New event';
+    // A single occurrence can't change the repeat rule — hide those controls.
+    $('ee-repeat-row').hidden = isOcc;
     $('ee-title-input').value = norm.title || '';
     var sel = $('ee-cal'); sel.innerHTML = '';
     editableCalendars().forEach(function (c) {
@@ -457,6 +476,12 @@
       body.start = new Date(sv).toISOString();
       body.end = ev2 ? new Date(ev2).toISOString() : '';
     }
+    if (eeScope === 'occurrence') {
+      // Edit just this instance: detach it from the series (server adds an EXDATE).
+      delete body.rrule;
+      body.scope = 'occurrence';
+      body.recurrence_id = eeRecurrenceId;
+    }
     if (eeSaving) return;          // guard against accidental double-submit
     eeSaving = true;
     var saveBtn = $('ee-form').querySelector('button[type="submit"]');
@@ -481,9 +506,46 @@
     });
   }
 
+  // Delete a single occurrence of a series (server EXDATEs it + drops any override).
+  function deleteOccurrence(seriesId, recurrenceId) {
+    if (!seriesId || !recurrenceId) return;
+    api('DELETE', '/api/event.php', { id: seriesId, scope: 'occurrence', recurrence_id: recurrenceId })
+      .then(function (res) {
+        if (res.ok) { closeEditor(); closeModal(); if (fc) fc.refetchEvents(); }
+        else alert((res.data && res.data.message) || 'Could not delete occurrence.');
+      });
+  }
+
+  // Delete from the detail modal, honouring the chosen scope for recurring events.
+  function deleteRecurring(ev, scope) {
+    if (scope === 'occurrence') {
+      var rid = ev.allDay ? String(ev.startStr).substr(0, 10) : ev.start.toISOString();
+      if (!confirm('Delete this occurrence?')) return;
+      deleteOccurrence(parseInt(ev.id, 10), rid);
+    } else {
+      if (!confirm('Delete the entire series?')) return;
+      api('DELETE', '/api/event.php', { id: parseInt(ev.id, 10) }).then(function (res) {
+        if (res.ok) { closeEditor(); closeModal(); if (fc) fc.refetchEvents(); }
+        else alert((res.data && res.data.message) || 'Could not delete event.');
+      });
+    }
+  }
+
+  // Outlook-style "this occurrence / entire series" chooser for recurring events.
+  function askScope(action, cb) {
+    window._ncScopeCb = cb;
+    $('rs-title').textContent = (action === 'delete') ? 'Delete recurring event' : 'Edit recurring event';
+    $('rs-msg').textContent = (action === 'delete')
+      ? 'Delete just this occurrence, or the entire series?'
+      : 'Edit just this occurrence, or the entire series?';
+    $('recur-scope').hidden = false;
+  }
+  function closeScope() { $('recur-scope').hidden = true; window._ncScopeCb = null; }
+
   /* ---------- drag / resize ---------- */
   function patchTimes(info) {
     var ev = info.event;
+    var p = ev.extendedProps || {};
     var body = { id: parseInt(ev.id, 10), all_day: ev.allDay };
     if (ev.allDay) {
       body.start = ev.startStr.substr(0, 10);
@@ -493,8 +555,16 @@
       body.start = ev.start.toISOString();
       body.end = (ev.end || new Date(ev.start.getTime() + 3600000)).toISOString();
     }
+    if (p.recurring) {
+      // Dragging a repeating event moves only this occurrence (Outlook default).
+      var old = info.oldEvent;
+      body.scope = 'occurrence';
+      body.recurrence_id = ev.allDay ? String(old.startStr).substr(0, 10) : old.start.toISOString();
+    }
     api('PATCH', '/api/event.php', body).then(function (res) {
-      if (!res.ok) { info.revert(); alert((res.data && res.data.message) || 'Could not move event.'); }
+      if (!res.ok) { info.revert(); alert((res.data && res.data.message) || 'Could not move event.'); return; }
+      // A recurring occurrence became an EXDATE + a detached override — repaint.
+      if (p.recurring && fc) { fc.refetchEvents(); }
     });
   }
 
@@ -818,8 +888,9 @@
         var slugs = Array.from(enabledSet());
         if (!slugs.length) { success([]); return; }
         var url = '/api/events.php?cals=' + encodeURIComponent(slugs.join(',')) +
-          '&from=' + encodeURIComponent(info.startStr) + '&to=' + encodeURIComponent(info.endStr);
-        fetch(url, { credentials: 'same-origin' })
+          '&from=' + encodeURIComponent(info.startStr) + '&to=' + encodeURIComponent(info.endStr) +
+          '&_=' + Date.now();   // cache-bust so an updated calendar never shows stale
+        fetch(url, { credentials: 'same-origin', cache: 'no-store' })
           .then(function (r) { return r.json(); })
           .then(function (d) {
             (d.events || []).forEach(function (e) {
@@ -836,7 +907,10 @@
     requestAnimationFrame(function () { try { fc.updateSize(); } catch (e) {} syncStickyToolbar(); });
     window.addEventListener('resize', function () { requestAnimationFrame(syncStickyToolbar); });
     // rAF is paused in background tabs; recompute the offset the moment the tab is shown.
-    document.addEventListener('visibilitychange', function () { if (!document.hidden) syncStickyToolbar(); });
+    // Also pull fresh events so returning after an update (e.g. a re-seed) shows current data.
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) { syncStickyToolbar(); if (fc) fc.refetchEvents(); }
+    });
   }
 
   /* ---------- emoji picker (shared by calendar 'ce' and event 'ee' editors) ---------- */
@@ -1028,11 +1102,26 @@
     $('modal-close').addEventListener('click', closeModal);
     $('event-modal').addEventListener('click', function (e) { if (e.target.id === 'event-modal') closeModal(); });
     $('modal-edit').addEventListener('click', function () {
-      if (window._ncCurrent) { closeModal(); openEventEditor(normFromEvent(window._ncCurrent)); }
+      var ev = window._ncCurrent; if (!ev) return;
+      if ((ev.extendedProps || {}).recurring) {
+        askScope('edit', function (scope) { closeModal(); openEventEditor(normFromEvent(ev, scope)); });
+      } else {
+        closeModal(); openEventEditor(normFromEvent(ev));
+      }
     });
     $('modal-delete').addEventListener('click', function () {
-      if (window._ncCurrent) deleteEvent(parseInt(window._ncCurrent.id, 10));
+      var ev = window._ncCurrent; if (!ev) return;
+      if ((ev.extendedProps || {}).recurring) {
+        askScope('delete', function (scope) { deleteRecurring(ev, scope); });
+      } else {
+        deleteEvent(parseInt(ev.id, 10));
+      }
     });
+    $('rs-close').addEventListener('click', closeScope);
+    $('rs-cancel').addEventListener('click', closeScope);
+    $('recur-scope').addEventListener('click', function (e) { if (e.target.id === 'recur-scope') closeScope(); });
+    $('rs-occurrence').addEventListener('click', function () { var cb = window._ncScopeCb; closeScope(); if (cb) cb('occurrence'); });
+    $('rs-series').addEventListener('click', function () { var cb = window._ncScopeCb; closeScope(); if (cb) cb('series'); });
 
     $('ee-close').addEventListener('click', closeEditor);
     $('ee-cancel').addEventListener('click', closeEditor);
@@ -1040,7 +1129,10 @@
     $('ee-form').addEventListener('submit', saveEvent);
     $('ee-allday').addEventListener('change', function () { toggleAllDayFields(this.checked); if (!$('ee-recur-opts').hidden) syncRecurUI(); });
     $('ee-cal').addEventListener('change', paintCalSelect);
-    $('ee-delete').addEventListener('click', function () { deleteEvent(eeId); });
+    $('ee-delete').addEventListener('click', function () {
+      if (eeScope === 'occurrence') { deleteOccurrence(eeSeriesId, eeRecurrenceId); }
+      else { deleteEvent(eeId); }
+    });
 
     // Markdown formatting toolbar: keep the textarea selection on mousedown,
     // then insert syntax on click (delegated so it works for any .md-toolbar).
